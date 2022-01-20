@@ -1,0 +1,4258 @@
+swagger: '2.0'
+info:
+  title: Integration Content
+  version: 1.0.0
+  description: "Integration content enables you to read, update, deploy or undeploy integration artifacts (such as integration flows) on a tenant. \nThis API is implemented based on OData version 2 specification."
+externalDocs:
+  description: 'SAP Cloud Integration documentation: OData API - Integration Content'
+  url: https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html
+x-sap-api-type: ODATA
+x-sap-shortText: Manage and query integration artifacts of design time and runtime.
+schemes:
+- https
+host: sandbox.api.sap.com
+basePath: /cpi/api/v1
+x-servers:
+- url: https://{Account Short Name}-tmn.{SSL Host}.{Landscapehost}/api/v1
+  description: SAP Cloud Integration REST API Endpoint
+  templates:
+    Account Short Name:
+      description: SAP BTP subaccount short name where Cloud Integration is provided
+    SSL Host:
+      description: SSL Host
+    Landscapehost:
+      description: SAP BTP Region Host
+      enum:
+      - ae1.hana.ondemand.com
+      - ap1.hana.ondemand.com
+      - br1.hana.ondemand.com
+      - ca1.hana.ondemand.com
+      - cn1.hana.ondemand.com
+      - eu1.hana.ondemand.com
+      - eu2.hana.ondemand.com
+      - eu3.hana.ondemand.com
+      - hana.ondemand.com
+      - hanatrial.ondemand.com
+      - jp1.hana.ondemand.com
+      - ru1.hana.ondemand.com
+      - sa1.hana.ondemand.com
+      - us1.hana.ondemand.com
+      - us2.hana.ondemand.com
+      - us3.hana.ondemand.com
+      - us4.hana.ondemand.com
+      default: hana.ondemand.com
+- url: https://{Custom Name}.{Domain}/api/v1
+  description: SAP Cloud Integration Custom Domain Endpoint - see [Configuring Custom Domains](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/7230b9ff41914cc0969223e6a020104b.html)
+  templates:
+    Custom Name:
+      description: Your defined name for your Cloud Integration account.
+    Domain:
+      description: Your custom domain
+securityDefinitions:
+  BasicAuthentication:
+    type: basic
+security:
+- BasicAuthentication: []
+consumes:
+- application/json
+produces:
+- application/json
+tags:
+- name: Integration Package - Discover
+- name: Integration Packages - Design
+- name: Runtime Artifacts
+- name: Error Information of Runtime Artifact
+- name: Integration Flow
+- name: Configurations of Integration Flow
+- name: Resources of Integration Flow
+- name: Endpoints of Runtime Artifacts
+- name: Value Mappings
+- name: Integration Adapter
+paths:
+  /CopyIntegrationPackage:
+    post:
+      description: |-
+        You can use the following request to copy an integration package from 'Discover' to 'Design' section. If the package already exists, either the existing package can be overwritten or a new package with a suffix for name and Id can be created. <br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to create a package of designtime.
+      summary: Copy an integration package.
+      tags:
+      - Integration Package - Discover
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: query
+        required: true
+        description: |-
+          Id of integration package - enclosed in single quotes <br>
+          Example: ```'ERPtoSuccessFactorsEmployeeCentralEmployeeandOrganizationalData'```.<br>
+          The Id can be found in the package URL.
+        type: string
+      - name: ImportMode
+        in: query
+        required: false
+        description: |-
+          If the package already exists, it can be overwritten by the copied package, or a new package could be created with a new suffix, which needs to be provided by query parameter 'Suffix'.<br>
+           OVERWRITE_MERGE - With this mode, the package will be copied and overwritten to an existing/already copied package from Discover, would keep the configurations (of externalized parameters) intact for the existing/already copied package's artifacts.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - '''CREATE_COPY'''
+          - '''OVERWRITE'''
+          - '''OVERWRITE_MERGE'''
+      - name: Suffix
+        in: query
+        required: false
+        description: |-
+          Suffix is required, if a package with the same name already exists and an additional copy of the same package should be created. The entered value must be enclosed in single quotes.<br>
+          Example: Entered Suffix ```'ABC'``` creates a new package, where ```.ABC``` is added to the name and to the artifacts Ids.<br>
+          Note: Only relevant for query parameter 'ImportMode' ```'CREATE_COPY'```.
+        type: string
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '201':
+          description: Package copied to designtime.
+          schema:
+            title: New IntegrationPackage
+            type: object
+            properties:
+              d:
+                $ref: '#/definitions/com.sap.hci.api.IntegrationPackage'
+          examples:
+            application/json:
+              d:
+                Id: ERPtoSuccessFactorsEmployeeCentralEmployeeandOrganizationalData
+                Name: ERP to SAP SuccessFactors Employee Central Employee and Organizational Data
+                Description: '&lt;p&gt;&lt;p&gt;&lt;p&gt;&lt;p&gt;&lt;p&gt;&lt;p&gt;&lt;p&gt;This integration package enables you to replicate employee master and organizational management data from&amp;nbsp;SAP ERP or SAP S/4HANA&amp;nbsp;to SAP SuccessFactors Employee Central. With this integration scenario you can manage employees and organizational data using ERP as the system of record and either regularly replicate the data to Employee Central when using the Side-by-Side deployment model. Or set up a delta-enabled migration to initially move the data from the ERP system to Employee Central if you want to transition to the Side-by-Side or the Core Hybrid deployment model.&lt;/p&gt;&lt;p&gt;Prerequisite for using this integration scenario: You need to have the PA_SE_IN 100 add-on with SP10 or higher installed in your SAP ERP or SAP S/4HANA system.&lt;/p&gt;&lt;p&gt;Note: You are only allowed to configure the content as described in the guide. If you make modifications not described in the guide, SAP will not provide support for the modified content.&lt;/p&gt;&lt;/p&gt;&lt;/p&gt;&lt;/p&gt;&lt;/p&gt;&lt;/p&gt;&lt;/p&gt;'
+                ShortText: Replicate employee master and organizational management data from SAP ERP or SAP S/4HANA to SAP SuccessFactors Employee Central
+                Version: 8.1.0
+                Vendor: SAP
+                Mode: READ_ONLY
+                SupportedPlatform: SAP HANA Cloud Integration
+                ModifiedBy: null
+                CreationDate: null
+                ModifiedDate: null
+                CreatedBy: null
+                Products: null
+                Keywords: null
+                Countries: null
+                Industries: null
+                LineOfBusiness: null
+                IntegrationDesigntimeArtifacts:
+                  __deferred:
+                    uri: https://cpisbsa1-tmn.avt.eu1.hana.ondemand.com:443/api/v1/IntegrationPackages('ERPtoSuccessFactorsEmployeeCentralEmployeeandOrganizationalData')/IntegrationDesigntimeArtifacts
+        '400':
+          description: Bad Request - because of unexpected Id value (e.g. Id provided without single quotes).
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: 'Unknown literal: ''[ERPtoSuccessFactorsEmployeeCentralEmployeeandOrganizationalData]''.'
+        '403':
+          $ref: '#/responses/403'
+        '409':
+          description: Conflict - because the package with the same name/Id already exists. In order to create a copy, add 'ImportMode' as ```'CREATE_COPY'``` and 'Suffix' with a new value or to overwrite existing content, specify 'ImportMode' as ```'OVERWRITE'```.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Conflict
+                message:
+                  lang: en
+                  value: Copy not successful from content hub to workpace due to conflict.In order to create an copy, add 'ImportMode' as 'CREATE_COPY' and 'Suffix' with desired value in url as parameter,Or to Overwrite existing content, specify 'ImportMode' as 'OVERWRITE' in url as parameter.
+  /IntegrationPackages:
+    get:
+      description: You can use the following request to get all integration packages of designtime.
+      summary: Get all integration packages.
+      tags:
+      - Integration Packages - Design
+      parameters:
+      - name: Author
+        in: query
+        description: |-
+          Custom Tag property defined in the tenant settings. You can provide multiple values.<br>
+          Example1: ```Author=Fred```
+          Example2: ```Author=Fred|John```
+        type: string
+      - name: LoB
+        in: query
+        description: |-
+          Custom Tag property defined in the tenant settings. You can provide multiple values.<br>
+          Example1: ```LoB=Sales```
+          Example2: ```LoB=Sales|Marketing```
+        type: string
+      - $ref: '#/parameters/top'
+      - $ref: '#/parameters/skip'
+      responses:
+        '200':
+          description: Retrieved integration packages of designtime
+          schema:
+            title: Collection of designtime integration packages
+            type: object
+            properties:
+              value:
+                type: array
+                items:
+                  $ref: '#/definitions/com.sap.hci.api.IntegrationPackage'
+          examples:
+            application/json:
+              d:
+                results:
+                - Id: CloudPlatformAPITestPackage
+                  Name: Cloud Integration API Test Package
+                  Description: <p><p><p></p></p></p>
+                  ShortText: This package contains artifacts, which are required for testing the read access of monitoring data.
+                  Version: ''
+                  Vendor: ''
+                  Mode: EDIT_ALLOWED
+                  SupportedPlatform: '[SAP Cloud Integration]'
+                  ModifiedBy: P2000096929
+                  CreationDate: '1521116198486'
+                  ModifiedDate: '1521463636583'
+                  CreatedBy: P2000096929
+                  Products: '[]'
+                  Keywords: '[]'
+                  Countries: '[]'
+                  Industries: '[]'
+                  LineOfBusiness: '[]'
+                - Id: ERPtoSuccessFactorsEmployeeCentralEmployeeandOrganizationalData
+                  Name: ERP to SAP SuccessFactors Employee Central Employee and Organizational Data
+                  Description: "<p><p></p>\n<p></p> \n<p></p> \n<p></p> \n<p></p> \n<p></p> \n<p></p> \n<p></p> \n<p>This integration package enables you to replicate employee master and organizational management data from&nbsp;SAP ERP or SAP S/4HANA&nbsp;to SAP SuccessFactors Employee Central. With this integration scenario you can manage employees and organizational data using ERP as the system of record and either regularly replicate the data to Employee Central when using the Side-by-Side deployment model. Or set up a delta-enabled migration to initially move the data from the ERP system to Employee Central if you want to transition to the Side-by-Side or the Core Hybrid deployment model.</p> \n<p>Prerequisite for using this integration scenario: You need to have the PA_SE_IN 100 add-on with SP10 or higher installed in your SAP ERP or SAP S/4HANA system.</p> \n<p>Note: You are only allowed to configure the content as described in the guide. If you make modifications not described in the guide, SAP will not provide support for the modified content.</p> \n<p></p> \n<p></p> \n<p></p> \n<p></p> \n<p></p> \n<p></p> \n<p></p>\n<p></p></p>"
+                  ShortText: Replicate employee master and organizational management data from SAP ERP or SAP S/4HANA to SAP SuccessFactors Employee Central
+                  Version: 8.2.0
+                  Vendor: SAP
+                  Mode: READ_ONLY
+                  SupportedPlatform: '[SAP Cloud Integration]'
+                  ModifiedBy: P2000096929
+                  CreationDate: '1569485723450'
+                  ModifiedDate: '1569485723453'
+                  CreatedBy: P2000096929
+                  Products: '[SAP SuccessFactors Employee Central, SAP ERP, SAP S/4HANA]'
+                  Keywords: '[Side-by-Side, SBS, Employee Data, PA_SE_IN]'
+                  Countries: '[]'
+                  Industries: '[]'
+                  LineOfBusiness: '[Human Resources]'
+        default:
+          $ref: '#/responses/error'
+    post:
+      description: |-
+        You can use the following request to create an integration package of designtime.<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to create integration package of designtime.
+      summary: Create new integration package.
+      tags:
+      - Integration Packages - Design
+      parameters:
+      - name: IntegrationPackage
+        in: body
+        description: Attributes of the new integration package
+        schema:
+          $ref: '#/definitions/com.sap.hci.api.IntegrationPackage-create'
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '201':
+          description: Integration package successfully created.
+          schema:
+            $ref: '#/definitions/com.sap.hci.api.IntegrationPackage'
+          examples:
+            application/json:
+              d:
+                Id: TestPackage
+                Name: Test Package
+                Description: <p>This is a new created test package</p>
+                ShortText: Test
+                Version: ''
+                Vendor: ''
+                Mode: EDIT_ALLOWED
+                SupportedPlatform: '[SAP Cloud Integration]'
+                ModifiedBy: P2000096929
+                CreationDate: '1580478987100'
+                ModifiedDate: '1580478987133'
+                CreatedBy: P2000096929
+                Products: '[]'
+                Keywords: '[]'
+                Countries: '[]'
+                Industries: '[]'
+                LineOfBusiness: '[]'
+                IntegrationDesigntimeArtifacts:
+                  __deferred:
+                    uri: https://cpisbsa1-tmn.avt.eu1.hana.ondemand.com:443/api/v1/IntegrationPackages('TestCreate')/IntegrationDesigntimeArtifacts
+        '400':
+          description: Bad request - Name and ShortText are required integration package attributes.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: Property 'Name' cannot be empty. Enter a valid Name.
+        '403':
+          $ref: '#/responses/403'
+        '409':
+          description: Conflict - integration pacakge with same ID already exists.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Conflict
+                message:
+                  lang: en
+                  value: Entity with the specified IntegrationPackage id already exist.
+  /IntegrationPackages('{Id}'):
+    get:
+      description: You can use the following request to get an integration packages of designtime by Id.
+      summary: Get integration package by ID
+      tags:
+      - Integration Packages - Design
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          ID of designtime integration package <br>
+          Example: ```ERPtoSuccessFactorsEmployeeCentralEmployeeandOrganizationalData```
+        type: string
+      responses:
+        '200':
+          description: Retrieved integration package
+          schema:
+            $ref: '#/definitions/com.sap.hci.api.IntegrationPackage'
+          examples:
+            application/json:
+              d:
+                Id: ERPtoSuccessFactorsEmployeeCentralEmployeeandOrganizationalData
+                Name: ERP to SAP SuccessFactors Employee Central Employee and Organizational Data
+                Description: "<p><p></p>\n<p></p> \n<p></p> \n<p></p> \n<p></p> \n<p></p> \n<p></p> \n<p></p> \n<p>This integration package enables you to replicate employee master and organizational management data from&nbsp;SAP ERP or SAP S/4HANA&nbsp;to SAP SuccessFactors Employee Central. With this integration scenario you can manage employees and organizational data using ERP as the system of record and either regularly replicate the data to Employee Central when using the Side-by-Side deployment model. Or set up a delta-enabled migration to initially move the data from the ERP system to Employee Central if you want to transition to the Side-by-Side or the Core Hybrid deployment model.</p> \n<p>Prerequisite for using this integration scenario: You need to have the PA_SE_IN 100 add-on with SP10 or higher installed in your SAP ERP or SAP S/4HANA system.</p> \n<p>Note: You are only allowed to configure the content as described in the guide. If you make modifications not described in the guide, SAP will not provide support for the modified content.</p> \n<p></p> \n<p></p> \n<p></p> \n<p></p> \n<p></p> \n<p></p> \n<p></p>\n<p></p></p>"
+                ShortText: Replicate employee master and organizational management data from SAP ERP or SAP S/4HANA to SAP SuccessFactors Employee Central
+                Version: 8.2.0
+                Vendor: SAP
+                Mode: READ_ONLY
+                SupportedPlatform: '[SAP Cloud Integration]'
+                ModifiedBy: P2000096929
+                CreationDate: '1569485723450'
+                ModifiedDate: '1569485723453'
+                CreatedBy: P2000096929
+                Products: '[SAP SuccessFactors Employee Central, SAP ERP, SAP S/4HANA]'
+                Keywords: '[Side-by-Side, SBS, Employee Data, PA_SE_IN]'
+                Countries: '[]'
+                Industries: '[]'
+                LineOfBusiness: '[Human Resources]'
+        '404':
+          description: Not found - integration package ID does not exist in designtime.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Requested entity could not be found.
+    put:
+      description: |-
+        You can use the following request to update an existing integration package of designtime.<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to update integration package of designtime.
+      summary: Update integration package.
+      tags:
+      - Integration Packages - Design
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: ID of designtime integration package
+        type: string
+      - name: IntegrationPackage
+        in: body
+        description: New attributes values of integration package
+        schema:
+          $ref: '#/definitions/com.sap.hci.api.IntegrationPackage-update'
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '202':
+          description: Update triggered for integration package.
+        '400':
+          description: Bad request - missing/wrong integration package attributes or malformed request body.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: Property 'Name' cannot be empty. Enter a valid Name.
+        '403':
+          description: Access forbidden - possibly it is a 'configure-only' integration package or you did not have the required permissions.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Forbidden
+                message:
+                  lang: en
+                  value: Entity with the specified integration package id is Configure-Only, modification is restricted
+        '404':
+          description: Not found - integration package ID does not exist in designtime.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Requested entity could not be found.
+    delete:
+      description: |-
+        You can use the following request to delete an existing integration package of designtime.<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to delete integration package of designtime.
+      summary: Delete integration package.
+      tags:
+      - Integration Packages - Design
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: ID of designtime integration package
+        type: string
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '202':
+          description: Deletion triggered for integration package.
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Not found - integration package ID does not exist in designtime.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Requested entity could not be found.
+  /IntegrationPackages('{Id}')/IntegrationDesigntimeArtifacts:
+    get:
+      description: You can use the following request to get all integration flows of a designtime integration package by package Id.
+      summary: Get all integration flows of a package.
+      tags:
+      - Integration Packages - Design
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          ID of designtime integration package <br>
+          Example: ```ERPtoSuccessFactorsEmployeeCentralEmployeeandOrganizationalData```
+        type: string
+      responses:
+        '200':
+          description: Retrieved integration flows of the integration package
+          schema:
+            title: Collection of integration flows with same integration package ID
+            type: object
+            properties:
+              value:
+                type: array
+                items:
+                  $ref: '#/definitions/com.sap.hci.api.IntegrationDesigntimeArtifact'
+          examples:
+            application/json:
+              d:
+                results:
+                - Id: com.sap.PA_SE_IN.erp2ec.SAPtoSFSFEmployeeKeyDataQuery.v1
+                  Version: 2.0.0
+                  PackageId: ERPtoSuccessFactorsEmployeeCentralEmployeeandOrganizationalData
+                  Name: ERP to SAP SuccessFactors Employee Central Employee Key Data Query
+                  Description: Replicates key data from SAP SuccessFactors Employee Central to SAP ERP or SAP S/4HANA
+                  ArtifactContent: null
+                  Configurations:
+                    __deferred:
+                      uri: https://sandbox.api.sap.com:9006/cpi/api/v1/IntegrationDesigntimeArtifacts(Id='com.sap.PA_SE_IN.erp2ec.SAPtoSFSFEmployeeKeyDataQuery.v1',Version='2.0.0')/Configurations
+                  Resources:
+                    __deferred:
+                      uri: https://sandbox.api.sap.com:9006/cpi/api/v1/IntegrationDesigntimeArtifacts(Id='com.sap.PA_SE_IN.erp2ec.SAPtoSFSFEmployeeKeyDataQuery.v1',Version='2.0.0')/Resources
+                - Id: com.sap.PA_SE_IN.erp2ec.SAPtoSFSFGenericODataUpsert.v1
+                  Version: 8.1.0
+                  PackageId: ERPtoSuccessFactorsEmployeeCentralEmployeeandOrganizationalData
+                  Name: ERP to SAP SuccessFactors Employee Central Generic OData Upsert
+                  Description: Replicates employee and organizational data from SAP ERP or SAP S/4HANA to SAP SuccessFactors Employee Central
+                  ArtifactContent: null
+                  Configurations:
+                    __deferred:
+                      uri: https://sandbox.api.sap.com:9006/cpi/api/v1/IntegrationDesigntimeArtifacts(Id='com.sap.PA_SE_IN.erp2ec.SAPtoSFSFGenericODataUpsert.v1',Version='8.1.0')/Configurations
+                  Resources:
+                    __deferred:
+                      uri: https://sandbox.api.sap.com:9006/cpi/api/v1/IntegrationDesigntimeArtifacts(Id='com.sap.PA_SE_IN.erp2ec.SAPtoSFSFGenericODataUpsert.v1',Version='8.1.0')/Resources
+        '404':
+          description: Not found - integration package ID does not exist in designtime.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Requested entity could not be found.
+  /IntegrationPackages('{Id}')/IntegrationDesigntimeArtifacts(Id='{ArtifactId}',Version='{ArtifactVersion}'):
+    get:
+      description: You can use the following request to get an integration flow of a designtime integration package by package Id, integration flow and integration flow version.
+      summary: Get an integration flow of a package.
+      tags:
+      - Integration Packages - Design
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          ID of designtime integration package <br>
+          Example: ```ERPtoSuccessFactorsEmployeeCentralEmployeeandOrganizationalData```
+        type: string
+      - name: ArtifactId
+        in: path
+        required: true
+        description: |-
+          ID of integration flow <br>
+          Example: ```com.sap.PA_SE_IN.erp2ec.SAPtoSFSFGenericODataUpsert.v1```
+        type: string
+      - name: ArtifactVersion
+        in: path
+        required: true
+        description: |-
+          Version of integration flow <br>
+          You can enter either ```active``` or the version name (e.g. ```8.1.0```) for retrieving the current version.
+        type: string
+        default: active
+      responses:
+        '200':
+          description: Retrieved integration flow
+          schema:
+            $ref: '#/definitions/com.sap.hci.api.IntegrationDesigntimeArtifact'
+          examples:
+            application/json:
+              d:
+                Id: com.sap.PA_SE_IN.erp2ec.SAPtoSFSFGenericODataUpsert.v1
+                Version: 8.1.0
+                PackageId: ERPtoSuccessFactorsEmployeeCentralEmployeeandOrganizationalData
+                Name: ERP to SAP SuccessFactors Employee Central Generic OData Upsert
+                Description: Replicates employee and organizational data from SAP ERP or SAP S/4HANA to SAP SuccessFactors Employee Central
+                ArtifactContent: null
+                Configurations:
+                  __deferred:
+                    uri: https://sandbox.api.sap.com:9006/cpi/api/v1/IntegrationDesigntimeArtifacts(Id='com.sap.PA_SE_IN.erp2ec.SAPtoSFSFGenericODataUpsert.v1',Version='8.1.0')/Configurations
+                Resources:
+                  __deferred:
+                    uri: https://sandbox.api.sap.com:9006/cpi/api/v1/IntegrationDesigntimeArtifacts(Id='com.sap.PA_SE_IN.erp2ec.SAPtoSFSFGenericODataUpsert.v1',Version='8.1.0')/Resources
+        '404':
+          description: Not found - integration package ID or integration flow ID with the version does not exist in designtime.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Requested entity could not be found.
+  /IntegrationPackages('{Id}')/ValueMappingDesigntimeArtifacts:
+    get:
+      description: You can use the following request to get all value mappings of a designtime integration package by package Id.
+      summary: Get all value mappings of a package.
+      tags:
+      - Integration Packages - Design
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          ID of designtime integration package <br>
+          Example: ```ValueMappingExamples```
+        type: string
+      responses:
+        '200':
+          description: Retrieved value mappings of the integration package
+          schema:
+            title: Collection of value mappings with same integration package ID
+            type: object
+            properties:
+              value:
+                type: array
+                items:
+                  $ref: '#/definitions/com.sap.hci.api.ValueMappingDesigntimeArtifact'
+          examples:
+            application/json:
+              d:
+                results:
+                - Id: ValueMapping1
+                  Version: 2.0.0
+                  PackageId: ValueMappingExamples
+                  Name: ValueMapping1
+                  Description: Value Mapping for test
+                  ArtifactContent: null
+                  ValMapSchema:
+                    __deferred:
+                      uri: https://sandbox.api.sap.com:9006/cpi/api/v1/ValueMappingDesigntimeArtifacts(Id='ValueMapping1',Version='2.0.0')/ValMapSchema
+                - Id: ValueMappingTesting
+                  Version: 1.0.0
+                  PackageId: ValueMappingExamples
+                  Name: ValueMapping2
+                  Description: ' '
+                  ArtifactContent: null
+                  ValMapSchema:
+                    __deferred:
+                      uri: https://sandbox.api.sap.com:9006/cpi/api/v1/ValueMappingDesigntimeArtifacts(Id='ValueMappingTesting',Version='1.0.0')/ValMapSchema
+        '404':
+          description: Not found - integration package ID does not exist in designtime.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Requested entity could not be found.
+  /IntegrationPackages('{Id}')/ValueMappingDesigntimeArtifacts(Id='{ArtifactId}',Version='{ArtifactVersion}'):
+    get:
+      description: You can use the following request to get a value mapping of a designtime integration package by package Id, valuen mapping and value mapping version.
+      summary: Get a value mapping of a package.
+      tags:
+      - Integration Packages - Design
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          ID of designtime integration package <br>
+          Example: ```ValueMappingExamples```
+        type: string
+      - name: ArtifactId
+        in: path
+        required: true
+        description: |-
+          ID of value mapping <br>
+          Example: ```ValueMapping1```
+        type: string
+      - name: ArtifactVersion
+        in: path
+        required: true
+        description: |-
+          Version of value mapping <br>
+          You can enter either ```active``` or the version name (e.g. ```2.0.0```) for retrieving the current version.
+        type: string
+        default: active
+      responses:
+        '200':
+          description: Retrieved value mapping
+          schema:
+            $ref: '#/definitions/com.sap.hci.api.ValueMappingDesigntimeArtifact'
+          examples:
+            application/json:
+              d:
+                Id: ValueMapping1
+                Version: 2.0.0
+                PackageId: ValueMappingExamples
+                Name: ValueMapping1
+                Description: Value Mapping for test
+                ArtifactContent: null
+                ValMapSchema:
+                  __deferred:
+                    uri: https://sandbox.api.sap.com:9006/cpi/api/v1/ValueMappingDesigntimeArtifacts(Id='ValueMapping1',Version='2.0.0')/ValMapSchema
+        '404':
+          description: Not found - integration package ID or value mapping ID with the version does not exist in designtime.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Requested entity could not be found.
+  /IntegrationPackages('{Id}')/CustomTags:
+    get:
+      description: You can use the following request to get Custom Tags of a designtime integration package by package Id.
+      summary: Get Custom Tags of a package.
+      tags:
+      - Integration Packages - Design
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          ID of designtime integration package <br>
+          Example: ```CloudPlatformAPITestPackage```
+        type: string
+      - $ref: '#/parameters/top'
+      - $ref: '#/parameters/skip'
+      - name: $orderby
+        in: query
+        description: Order items by property values, see [Orderby System Query Option](https://www.odata.org/documentation/odata-version-2-0/uri-conventions/)
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - Name
+          - Name desc
+      responses:
+        '200':
+          description: Retrieved Custom Tags
+          examples:
+            application/json:
+              d:
+                results:
+                - __metadata:
+                    id: https://b50001-tmn.hci.int.sap.eu2.hana.ondemand.com:443/api/v1/CustomTags('Author')
+                    uri: https://b50001-tmn.hci.int.sap.eu2.hana.ondemand.com:443/api/v1/CustomTags('Author')
+                    type: com.sap.hci.api.CustomTag
+                  Name: Author
+                  Value: Fred
+                - __metadata:
+                    id: https://b50001-tmn.hci.int.sap.eu2.hana.ondemand.com:443/api/v1/CustomTags('LoB')
+                    uri: https://b50001-tmn.hci.int.sap.eu2.hana.ondemand.com:443/api/v1/CustomTags('LoB')
+                    type: com.sap.hci.api.CustomTag
+                  Name: LoB
+                  Value: ''
+        '404':
+          description: Not found - integration package ID does not exist in designtime.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Requested entity could not be found.
+        '400':
+          description: Bad request.
+          schema:
+            $ref: '#/definitions/odata.error'
+  /IntegrationPackages('{Id}')/$links/CustomTags('{Name}'):
+    put:
+      description: |-
+        You can use the following request to update a Custom Tag.<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required  permissions to update Custom Tags.
+      summary: Update a Custom Tag.
+      tags:
+      - Integration Packages - Design
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          ID of designtime integration package. <br>
+          Example: ```CloudPlatformAPITestPackage```
+        type: string
+      - name: Name
+        in: path
+        required: true
+        description: Name of the Custom Tag which values are to be updated.
+        type: string
+      - name: Value
+        in: body
+        description: 'Value of the Custom Tag to be udpated. You can define multiple values.<br>Example1: ```Fred```<br>Example2: ```Fred|John```'
+        schema:
+          $ref: '#/definitions/com.sap.hci.api.CustomTags-Update'
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '202':
+          description: Accepted
+        '400':
+          description: Bad request - Entity key in the URI does not match the key in the payload.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: Invalid resource type.
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          $ref: '#/responses/404'
+  /CustomTagConfigurations('CustomTags')/$value:
+    get:
+      description: You can use the following request to get all custom tags.
+      summary: Get all custom tags.
+      tags:
+      - Custom Tags Configuration
+      responses:
+        '200':
+          description: Retrieved custom tags
+          schema:
+            title: Collection of custom tags
+            type: object
+            properties:
+              value:
+                type: array
+                items:
+                  $ref: '#/definitions/com.sap.hci.api.IntegrationPackage'
+          examples:
+            application/json:
+              customTagsConfiguration:
+              - tagName: Author
+                permittedValues:
+                - Mr Bean, Ms Bean
+                isMandatory: 'true'
+        default:
+          $ref: '#/responses/error'
+  /CustomTagConfigurations:
+    post:
+      description: |-
+        You can use the following request to create or upload custom tags configuration.<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to create integration flows of designtime.
+      summary: Create/upload custom tags configuration.
+      tags:
+      - Custom Tags Configuration
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: CustomTagConfiguration
+        in: body
+        description: As request body, provide the JSON representation of the custom tag configuration in base64 format.<br>For more information, see SAP Help Portal documentation at [Create New Custom Tags Configuration](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/31e830841ace4ab08b1c586e910c47c0.html).
+        schema:
+          $ref: '#/definitions/com.sap.hci.api.CustomTagsConfiguration-create'
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '201':
+          description: Created
+        '400':
+          description: Bad request - wrong name or body is not provided in the expected JSON format.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: Illegal argument for method call with message 'CustomTagsConfigurationContent1'.
+        '409':
+          description: Conflict - CustomTag configuration already exists.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Conflict
+                message:
+                  lang: en
+                  value: CustomTag Configuration is already exist. To overwrite existing configuration, try with 'Overwrite=true' custom query params.
+  /IntegrationDesigntimeArtifacts:
+    post:
+      description: |-
+        You can use the following request to create or upload an integration flow of designtime.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to create integration flows of designtime.
+      summary: Create/upload an integration flow.
+      tags:
+      - Integration Flow
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: IntegrationFlow
+        in: body
+        description: |-
+          New integration flow requires name and package Id. <br>
+          The name should begin with alphabetic character or underscore ```_``` and can also contain numbers, space, period ```.``` or hyphen ```-```. But it should not end with period ```.```.<br>
+          The artifact content is only required, if integration flow zip content in base64-encoded format should be uploaded.
+        schema:
+          $ref: '#/definitions/com.sap.hci.api.IntegrationDesigntimeArtifact-create'
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '201':
+          description: Integration flow successfully created.
+          schema:
+            title: New IntegrationDesigntimeArtifact
+            type: object
+            properties:
+              d:
+                $ref: '#/definitions/com.sap.hci.api.IntegrationDesigntimeArtifact'
+          examples:
+            application/json:
+              d:
+                Id: IntegrationFlowWithConfiguration
+                Version: 1.0.0
+                PackageId: PackageforTest
+                Name: Configuration Integration Flow
+                Description: ' '
+        '400':
+          description: Bad request - wrong name or body is not provided in the expected JSON format.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: Name should begin with alphabet or underscore (_) and can also contain numbers, space, period(.) or hyphen(-). But it should not end with period(.)
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Not found - package Id does not exist.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Package ID TestPackage123 does not exist.
+        '500':
+          description: Internal server error - possibly an integration flow with the same Id already exists.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Internal Server Error
+                message:
+                  lang: en
+                  value: An integration flow Integration Flow with Configuration with the ID IntegrationFlowWithConfiguration already exists in the Cloud Integration API Test Package package. Please rename the artifact ID.
+  /IntegrationDesigntimeArtifacts(Id='{Id}',Version='{Version}'):
+    get:
+      description: "You can use the following request to get an integration flow of designtime by Id and version.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).<br>\nIn API sandbox the following designtime integration flows with Id and version are available:\n* '__IntegrationFlow_FAILED_DEPLOYMENT__' with version '__1.0.0__' \n* '__IntegrationFlow_MessageStore_COMPLETED_PROCESSING__' with version '__1.0.0__'\n* '__IntegrationFlow_AdapterData_FAILED_PROCESSING__' with version '__1.0.0__'\n* '__IntegrationFlowWithConfiguration__' with version '__1.0.5__'"
+      summary: Get an integration flow by Id and version.
+      tags:
+      - Integration Flow
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration artifact <br>
+          Example: ```IntegrationFlowWithConfiguration```
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration artifact <br>
+          You can enter either ```active``` or the version name (e.g. ```1.0.5```) for retrieving the current version.
+        type: string
+        default: active
+      - name: $select
+        in: query
+        description: Select properties to be returned.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - Name
+          - Version
+          - PackageId
+      responses:
+        '200':
+          description: Retrieved entity
+          schema:
+            title: IntegrationDesigntimeArtifact
+            type: object
+            properties:
+              d:
+                $ref: '#/definitions/com.sap.hci.api.IntegrationDesigntimeArtifact'
+          examples:
+            application/json:
+              d:
+                Id: IntegrationFlowWithConfiguration
+                Version: 1.0.5
+                PackageId: PackageforAdapterTest
+                Name: Configuration Integration Flow
+                Description: ' '
+                Sender: ''
+                Receiver: ''
+                ArtifactContent: null
+                Configurations: {}
+                Resources: {}
+        '400':
+          description: Bad request
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: 'Invalid key predicate: ...'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Not found
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Integration design time artifact not found
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/odata.error'
+        default:
+          $ref: '#/responses/error'
+    put:
+      description: |-
+        You can use the following request to update an integration flow from designtime.<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to update integration flows from designtime.
+      summary: Update an integration flow.
+      tags:
+      - Integration Flow
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration artifact <br>
+          Example: ```IntegrationFlowWithConfiguration```
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Current version of integration artifact to be updated <br>
+          You can enter either ```active``` or the current/latest version name (e.g. ```1.0.5```).
+        type: string
+        default: active
+      - name: IntegrationDesigntimeArtifact
+        in: body
+        description: New attribute values of the Integration Designtime artifact. Check the following table for behavior depending on provided or not provided attributes:<br><table><tr><td>```Name```</td><td width=150px>```ArtifactContent```</td><td>```Behavior```</td></tr><tr><td >Yes</td><td>No</td><td>Save as draft</td></tr><tr><td>Yes</td><td>Yes</td><td>Update & Save by picking bundle version from Bundle Manifest</td></tr><tr><td>No</td><td>Yes</td><td>Update & Save by picking bundle version & bundle Name (iFlow name) from Bundle Manifest</td></tr></table>
+        schema:
+          $ref: '#/definitions/com.sap.hci.api.IntegrationDesigntimeArtifact-update'
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/responses/400'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Integration design time artifact not found.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Integration design time artifact not found.
+    delete:
+      description: |-
+        You can use the following request to delete an integration flow from designtime.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to delete integration flows from designtime.
+      summary: Delete an integration flow.
+      tags:
+      - Integration Flow
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration artifact <br>
+          Example: ```IntegrationFlowWithConfiguration```
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration artifact  <br>
+          You can enter either ```active``` or the version name (e.g. ```1.0.5```) for retrieving the current version.
+        type: string
+        default: active
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '200':
+          description: Success
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Not found - integration flow with given Id and version does not exist.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Integration design time artifact not found.
+  /IntegrationDesigntimeArtifactSaveAsVersion:
+    post:
+      description: |-
+        You can use the following request to update an artifact with new specified version.<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to update integration flows from designtime.
+      summary: Update an artifact with version.
+      tags:
+      - Integration Flow
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: query
+        required: true
+        description: |-
+          Id of integration artifact <br>
+          Example: ```IntegrationFlowWithConfiguration```
+        type: string
+      - name: SaveAsVersion
+        in: query
+        required: true
+        description: |-
+          New version of integration artifact <br>
+           (e.g. ```1.0.5```).
+        type: string
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/responses/400'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Integration design time artifact not found.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Integration design time artifact not found.
+  /IntegrationDesigntimeArtifacts(Id='{Id}',Version='{Version}')/$value:
+    get:
+      description: "You can use the following request to download an integration flow of designtime as zip file. Integration flows of configure-only packages cannot be downloaded.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).<br>\nIn API sandbox the following designtime integration flows with Id and version are available:\n* '__IntegrationFlow_FAILED_DEPLOYMENT__' with version '__1.0.0__' \n* '__IntegrationFlow_MessageStore_COMPLETED_PROCESSING__' with version '__1.0.0__'\n* '__IntegrationFlow_AdapterData_FAILED_PROCESSING__' with version '__1.0.0__'\n* '__IntegrationFlowWithConfiguration__' with version '__1.0.5__'"
+      summary: Download an integration flow as zip file.
+      tags:
+      - Integration Flow
+      produces:
+      - application/zip
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration artifact <br>
+          Example: ```IntegrationFlowWithConfiguration```
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration artifact  <br>
+          You can enter either ```active``` or the version name (e.g. ```1.0.5```) for retrieving the current version.
+        type: string
+        default: active
+      responses:
+        '200':
+          description: Retrieved entity
+          schema:
+            type: file
+        default:
+          $ref: '#/responses/error'
+  /DeployIntegrationDesigntimeArtifact:
+    post:
+      description: |-
+        You can use the following request to deploy an integration flow of designtime.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to deploy integration flows from designtime.
+      summary: Deploy an integration flow.
+      tags:
+      - Integration Flow
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: query
+        required: true
+        description: |-
+          Id of integration artifact - enclosed in single quotes <br>
+          Example: ```'IntegrationFlowWithConfiguration'```
+        type: string
+      - name: Version
+        in: query
+        required: true
+        description: |-
+          Version of integration artifact - enclosed in single quotes  <br>
+          You can enter either ```'active'``` or the version name (e.g. ```'1.0.5'```) for retrieving the current version.
+        type: string
+        default: '''active'''
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '202':
+          description: Deployment triggered for integration artifact of designtime.
+        '400':
+          description: Bad request - wrong Id or version or single quotes are missing.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: No content for id 'TestIntegrationFlow'.
+        '403':
+          $ref: '#/responses/403'
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Internal Server Error
+                message:
+                  lang: en
+                  value: <error text>
+  /IntegrationDesigntimeArtifacts(Id='{Id}',Version='{Version}')/Configurations:
+    get:
+      description: |-
+        You can use the following request to get the configuration parameters (key/value pairs) of a designtime integration artifact by Id and version.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).<br>
+        In API sandbox the following designtime integration flow contains configuration parameters: '__IntegrationFlowWithConfiguration__' with version '__1.0.5__'
+      summary: Get configurations of an integration flow by Id and version.
+      tags:
+      - Configurations of Integration Flow
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration artifact <br>
+          Example: ```IntegrationFlowWithConfiguration```
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration artifact  <br>
+          You can enter either ```active``` or the version name (e.g. ```1.0.5```) for retrieving the current version.
+        type: string
+        default: active
+      - name: $filter
+        in: query
+        description: |-
+          Returns a subset of the entries, which matches the filter condition.<br>
+          Supported operators: ```eq``` and ```ne```<br>
+          Supported string functions: ```substringof```, ```startswith``` and ```endswith```.<br>
+          Example: ```substringof('Receiver_',ParameterKey) eq true```
+        type: string
+      - name: $select
+        in: query
+        description: Select properties to be returned.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - ParameterKey
+          - ParameterValue
+          - DataType
+      - name: $orderby
+        in: query
+        description: Order items by property values.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - ParameterKey
+          - ParameterKey desc
+      - name: $format
+        in: query
+        description: Response format can be JSON or XML.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - json
+          - xml
+        default: json
+      responses:
+        '200':
+          description: Retrieved entity
+          schema:
+            title: Collection of Configuration for IntegrationDesigntimeArtifact
+            type: object
+            properties:
+              d:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/definitions/com.sap.hci.api.Configuration'
+          examples:
+            application/json:
+              d:
+                results:
+                - ParameterKey: Receiver_Address3
+                  ParameterValue: http://receiver3
+                  DataType: xsd:string
+                - ParameterKey: Receiver_Address2
+                  ParameterValue: http://receiver2
+                  DataType: xsd:string
+                - ParameterKey: Receiver_Address1
+                  ParameterValue: http://receiver1
+                  DataType: xsd:string
+                - ParameterKey: ERP_enableBasicAuthentication_common
+                  ParameterValue: 'true'
+                  DataType: xsd:string
+                - ParameterKey: DataStore_1
+                  ParameterValue: DataStore_ABC
+                  DataType: xsd:string
+                - ParameterKey: Parameter1
+                  ParameterValue: Value1
+                  DataType: xsd:string
+                - ParameterKey: Sender_Address
+                  ParameterValue: /SenderSystem_123
+                  DataType: xsd:string
+                - ParameterKey: Parameter2
+                  ParameterValue: Value2
+                  DataType: xsd:string
+                - ParameterKey: Parameter3
+                  ParameterValue: Value3
+                  DataType: xsd:string
+        default:
+          $ref: '#/responses/error'
+  /IntegrationDesigntimeArtifacts(Id='{Id}',Version='{Version}')/Configurations/$count:
+    get:
+      description: |-
+        You can use the following request to get the number of configuration parameters (key/value pairs) for a designtime integration artifact by Id and version.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).<br>
+        In API sandbox the following designtime integration flow contains configuration parameters: '__IntegrationFlowWithConfiguration__' with version '__1.0.5__'
+      summary: Get number of configuration parameters.
+      tags:
+      - Configurations of Integration Flow
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration artifact <br>
+          Example: ```IntegrationFlowWithConfiguration```
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration artifact  <br>
+          You can enter either ```active``` or the version name (e.g. ```1.0.5```) for retrieving the current version.
+        type: string
+        default: active
+      - name: $filter
+        in: query
+        description: |-
+          Returns a subset of the entries, which matches the filter condition.<br>
+          Supported operators: ```eq``` and ```ne```<br>
+          Supported string functions: ```substringof```, ```startswith``` and ```endswith```.<br>
+          Example: ```substringof('Receiver_',ParameterKey) eq true```
+        type: string
+      responses:
+        '200':
+          description: Number of retrieved configuration parameters for an integration flow
+        default:
+          $ref: '#/responses/error'
+  /IntegrationDesigntimeArtifacts(Id='{Id}',Version='{Version}')/$links/Configurations('{ParameterKey}'):
+    put:
+      description: |-
+        You can use the following request to update the value for a configuration parameters of a designtime integration flow.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to ntegration flows from designtime.You need to configure an API endpoint for your account, where you have the required write permissions to update configuration parameters of an integration flow.
+      summary: Update configuration parameter of an integration flow.
+      tags:
+      - Configurations of Integration Flow
+      produces:
+      - ''
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration artifact <br>
+          Example: ```IntegrationFlowWithConfiguration```
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration artifact  <br>
+          You can enter either ```active``` or the version name (e.g. ```1.0.5```) for retrieving the current version.
+        type: string
+        default: active
+      - name: ParameterKey
+        in: path
+        required: true
+        description: |-
+          Parameter key <br>
+          Example: ```Parameter1```
+        type: string
+      - name: ConfigurationParameter
+        in: body
+        description: Configuration Parameter (DataType is optional)
+        schema:
+          $ref: '#/definitions/com.sap.hci.api.Configuration-update'
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '202':
+          description: Update triggered for configuration parameter.
+        '400':
+          description: Bad request - wrong body format for the expected parameter value.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: An exception of type 'MalformedJsonException' occurred.
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Not found - either wrong version for the given Id or wrong parameter key.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Parameter key 'Parameter1' not found.
+  /IntegrationDesigntimeArtifacts(Id='{Id}',Version='{Version}')/Resources:
+    get:
+      description: 'You can use the following request to get all resources of an integration flow from designtime.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).'
+      summary: Get all resources of an integration flow.
+      tags:
+      - Resources of Integration Flow
+      produces:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration artifact <br>
+          Example: ```IntegrationFlowWithConfiguration```
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration artifact  <br>
+          You can enter either ```active``` or the version name (e.g. ```1.0.5```) for retrieving the current version.
+        type: string
+        default: active
+      - name: $filter
+        in: query
+        description: |-
+          Returns a subset of the entries, which matches the filter condition.<br>
+          Supported operators: ```eq``` and ```ne```<br>
+          Supported string functions: ```substringof```, ```startswith``` and ```endswith```.<br>
+          Example: ```substringof('wsdl',Name) eq true```
+        type: string
+      - name: $select
+        in: query
+        description: Select properties to be returned.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - Name
+          - ResourceType
+          - ReferencedResourceType
+      - name: $orderby
+        in: query
+        description: Order items by property values.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - Name
+          - Name desc
+          - ResourceType
+          - ResourceType desc
+          - Name,ResourceType
+          - Name desc,ResourceType desc
+      - name: $format
+        in: query
+        description: Response format can be JSON or XML.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - json
+          - xml
+        default: json
+      responses:
+        '200':
+          description: Retrieved entities
+          schema:
+            title: Wrapper
+            type: object
+            properties:
+              d:
+                title: Collection of Resource
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/definitions/com.sap.hci.api.Resource'
+          examples:
+            application/json:
+              d:
+                results:
+                - Name: eDocPeruInvoiceTransmissionSimplified.wsdl
+                  ResourceType: wsdl
+                  ReferencedResourceType: null
+                  ResourceContent: null
+                - Name: billServiceFlat.wsdl
+                  ResourceType: wsdl
+                  ReferencedResourceType: null
+                  ResourceContent: null
+                - Name: PipelineNominationModify.xsd
+                  ResourceType: xsd
+                  ReferencedResourceType: null
+                  ResourceContent: null
+                - Name: AddSignatureInfo.xsl
+                  ResourceType: xslt
+                  ReferencedResourceType: null
+                  ResourceContent: null
+                - Name: AddExtensionContent.xsl
+                  ResourceType: xslt
+                  ReferencedResourceType: null
+                  ResourceContent: null
+                - Name: unzip.gsh
+                  ResourceType: groovy
+                  ReferencedResourceType: null
+                  ResourceContent: null
+        default:
+          $ref: '#/responses/error'
+    post:
+      description: |-
+        You can use the following request to add a resource to an integration flow of designtime.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to update integration flows.
+      summary: Add a Resource to an integration flow.
+      tags:
+      - Resources of Integration Flow
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration artifact <br>
+          Example: ```IntegrationFlowWithConfiguration```
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration artifact  <br>
+          You can enter either ```active``` or the version name (e.g. ```1.0.5```) for retrieving the current version.
+        type: string
+        default: active
+      - name: Resource
+        in: body
+        description: New entity
+        schema:
+          $ref: '#/definitions/com.sap.hci.api.Resource-create'
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '201':
+          description: Retrieved entities
+          schema:
+            title: Wrapper
+            type: object
+            properties:
+              d:
+                $ref: '#/definitions/com.sap.hci.api.Resource'
+          examples:
+            application/json:
+              d:
+                Name: AddSignatureInfo.xsl
+                ResourceType: xslt
+                ReferencedResourceType: null
+                ResourceContent: null
+        '400':
+          description: Bad request - wrong resource type/content or integration flow is locked.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: Invalid resource type.
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Not found - integration flow with given Id and version does not exist.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Integration design time artifact not found.
+  /IntegrationDesigntimeArtifacts(Id='{Id}',Version='{Version}')/Resources/$count:
+    get:
+      description: 'You can use the following request to get the number of all resources for an integration flow from designtime.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).'
+      summary: Get number of resource.
+      tags:
+      - Resources of Integration Flow
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration artifact <br>
+          Example: ```IntegrationFlowWithConfiguration```
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration artifact  <br>
+          You can enter either ```active``` or the version name (e.g. ```1.0.5```) for retrieving the current version.
+        type: string
+        default: active
+      - name: $filter
+        in: query
+        description: |-
+          Returns a subset of the entries, which matches the filter condition.<br>
+          Supported operators: ```eq``` and ```ne```<br>
+          Supported string functions: ```substringof```, ```startswith``` and ```endswith```.<br>
+          Example: ```substringof('wsdl',Name) eq true```
+        type: string
+      responses:
+        '200':
+          description: Number of retrieved resources for an integration flow
+        default:
+          $ref: '#/responses/error'
+  /IntegrationDesigntimeArtifacts(Id='{Id}',Version='{Version}')/Resources(Name='{Name}',ResourceType='{Type}'):
+    get:
+      description: 'You can use the following request to get a resource of an integration flow from designtime.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).'
+      summary: Get a resource of an integration flow.
+      tags:
+      - Resources of Integration Flow
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration artifact <br>
+          Example: ```IntegrationFlowWithConfiguration```
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration artifact  <br>
+          You can enter either ```active``` or the version name (e.g. ```1.0.5```) for retrieving the current version.
+        type: string
+        default: active
+      - name: Name
+        in: path
+        required: true
+        description: |-
+          Resource name <br>
+          Example: ```AddSignatureInfo.xsl```
+        type: string
+      - name: Type
+        in: path
+        required: true
+        description: |-
+          Resource type <br>
+          Example: ```xslt```
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - edmx
+          - groovy
+          - jar
+          - js
+          - mmap
+          - opmap
+          - wsdl
+          - xsd
+          - xslt
+      - name: ReferencedResourceType
+        in: query
+        description: Reference to another resource type (only for resource type 'xsd' the reference to 'wsdl' is allowed).
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - wsdl
+      - name: $select
+        in: query
+        description: Select properties to be returned.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - Name
+          - ResourceType
+          - ReferencedResourceType
+      responses:
+        '200':
+          description: Retrieved entities
+          schema:
+            title: Wrapper
+            type: object
+            properties:
+              d:
+                $ref: '#/definitions/com.sap.hci.api.Resource'
+          examples:
+            application/json:
+              d:
+                Name: AddSignatureInfo.xsl
+                ResourceType: xslt
+                ReferencedResourceType: null
+                ResourceContent: null
+        default:
+          $ref: '#/responses/error'
+  /IntegrationDesigntimeArtifacts(Id='{Id}',Version='{Version}')/Resources(Name='{Name}',ResourceType='{Type}')/$value:
+    get:
+      description: 'You can use the following request to download resource content of an integration flow from designtime. <br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).'
+      summary: Download resource content of an integration flow.
+      tags:
+      - Resources of Integration Flow
+      produces:
+      - application/octet-stream
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration artifact <br>
+          Example: ```IntegrationFlowWithConfiguration```
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration artifact  <br>
+          You can enter either ```active``` or the version name (e.g. ```1.0.5```) for retrieving the current version.
+        type: string
+        default: active
+      - name: Name
+        in: path
+        required: true
+        description: |-
+          Resource name <br>
+          Example: ```AddSignatureInfo.xsl```
+        type: string
+      - name: Type
+        in: path
+        required: true
+        description: |-
+          Resource type <br>
+          Example: ```xslt```
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - edmx
+          - groovy
+          - jar
+          - js
+          - mmap
+          - opmap
+          - wsdl
+          - xsd
+          - xslt
+      - name: ReferencedResourceType
+        in: query
+        description: Reference to another resource type (only for resource type 'xsd' the reference to 'wsdl' is allowed).
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - wsdl
+      responses:
+        '200':
+          description: Retrieved resource content of an integration flow from designtime
+        default:
+          $ref: '#/responses/error'
+  /IntegrationDesigntimeArtifacts(Id='{Id}',Version='{Version}')/$links/Resources(Name='{Name}',ResourceType='{Type}'):
+    put:
+      description: |-
+        You can use the following request to update a resource of an integration flow from designtime.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to update an integration flow.
+      summary: Update a resource of an integration flow.
+      tags:
+      - Resources of Integration Flow
+      produces:
+      - ''
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration artifact <br>
+          Example: ```IntegrationFlowWithConfiguration```
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration artifact  <br>
+          You can enter either ```active``` or the version name (e.g. ```1.0.5```) for retrieving the current version.
+        type: string
+        default: active
+      - name: Name
+        in: path
+        required: true
+        description: |-
+          Resource name <br>
+          Example: ```AddSignatureInfo.xsl```
+        type: string
+      - name: Type
+        in: path
+        required: true
+        description: |-
+          Resource type <br>
+          Example: Use ```xslt```
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - edmx
+          - groovy
+          - jar
+          - js
+          - mmap
+          - opmap
+          - wsdl
+          - xsd
+          - xslt
+      - name: ReferencedResourceType
+        in: query
+        description: Reference to another resource type (only for resource type 'xsd' the reference to 'wsdl' is allowed).
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - wsdl
+      - name: Resource
+        in: body
+        description: ResourceContent
+        schema:
+          $ref: '#/definitions/com.sap.hci.api.Resource-update'
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '202':
+          description: Update triggered for resource.
+        '400':
+          description: Bad request - resource with the given name/type does not exist.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: Resource does not exist.
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Not found - integration flow with given Id and version does not exist.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Integration design time artifact not found.
+        '500':
+          description: Internal server error - possibly invalid resource content.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Internal Server Error
+                message:
+                  lang: en
+                  value: <error text>
+    delete:
+      description: |-
+        You can use the following request to delete a resource of an integration flow from designtime.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [Remote OData APIs for Integration Flows](https://blogs.sap.com/2018/07/06/cloud-integration-remote-odata-apis-for-integration-flows/).<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to update integration flows.
+      summary: Delete a resource of an integration flow.
+      tags:
+      - Resources of Integration Flow
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration artifact <br>
+          Example: ```IntegrationFlowWithConfiguration```
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration artifact  <br>
+          You can enter either ```active``` or the version name (e.g. ```1.0.5```) for retrieving the current version.
+        type: string
+        default: active
+      - name: Name
+        in: path
+        required: true
+        description: |-
+          Resource name <br>
+          Example: ```AddSignatureInfo.xsl```
+        type: string
+      - name: Type
+        in: path
+        required: true
+        description: |-
+          Resource type <br>
+          Example: ```xslt```
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - edmx
+          - groovy
+          - jar
+          - js
+          - mmap
+          - opmap
+          - wsdl
+          - xsd
+          - xslt
+      - name: ReferencedResourceType
+        in: query
+        description: Reference to another resource type (only for resource type 'xsd' the reference to 'wsdl' is allowed).
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - wsdl
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad request - resource with the given name/type does not exist.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: Resource does not exist.
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Not found - integration flow with given Id and version does not exist.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Integration design time artifact not found.
+  /IntegrationRuntimeArtifacts:
+    get:
+      description: |-
+        You can use the following request to get all deployed integration artifacts.<br>
+        In API sandbox the following integration flows are deployed:<br>
+        * '__Integration Flow - FAILED DEPLOYMENT__' with deployment error information
+        * '__Integration Flow with MessageStore - COMPLETED PROCESSING__' with attachments and message store entries
+        * '__Integration Flow with Adapter Data - FAILED PROCESSING__' with message processing log error information, attachments, custom header properties and adapater data
+      summary: Get all deployed integration artifacts.
+      tags:
+      - Runtime Artifacts
+      parameters:
+      - name: $select
+        in: query
+        description: Select properties to be returned.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - Id
+          - Version
+          - Name
+          - Type
+          - DeployedBy
+          - DeployedOn
+          - Status
+      - name: $filter
+        in: query
+        description: |-
+          Filter items by property values (not possible for DeployedOn). No nesting possible. Only logical operator ```or``` is allowed. <br>
+          Example1: ```Status eq 'ERROR'``` returns all deployed integration artifacts in status 'ERROR'.<br>
+          Example2: ```Status eq 'ERROR' or Version eq '1.0.0'```
+        type: string
+      - $ref: '#/parameters/top'
+      - $ref: '#/parameters/skip'
+      - $ref: '#/parameters/inlinecount'
+      - name: $orderby
+        in: query
+        description: Order items by property values, see [Orderby System Query Option](https://www.odata.org/documentation/odata-version-2-0/uri-conventions/)
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - Id
+          - Id desc
+          - Version
+          - Version desc
+          - Name
+          - Name desc
+          - Type
+          - Type desc
+          - DeployedBy
+          - DeployedBy desc
+          - DeployedOn
+          - DeployedOn desc
+          - Status
+          - Status desc
+      responses:
+        '200':
+          description: Retrieved entities
+          schema:
+            title: Collection of IntegrationRuntimeArtifact
+            type: object
+            properties:
+              d:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/definitions/com.sap.hci.api.IntegrationRuntimeArtifact'
+          examples:
+            application/json:
+              d:
+                results:
+                - Id: IntegrationFlow_MessageStore_COMPLETED_PROCESSING
+                  Version: 1.0.0
+                  Name: Integration Flow with MessageStore - COMPLETED PROCESSING
+                  Type: INTEGRATION_FLOW
+                  DeployedBy: Tester
+                  DeployedOn: /Date(1521463557739)/
+                  Status: STARTED
+                  ErrorInformation:
+                    __deferred:
+                      uri: https://sandbox.api.sap.com/cpi/api/v1/IntegrationRuntimeArtifacts('IntegrationFlow_FAILED_DEPLOYMENT')/ErrorInformation
+                - Id: IntegrationFlow_FAILED_DEPLOYMENT
+                  Version: 1.0.0
+                  Name: Integration Flow - FAILED DEPLOYMENT
+                  Type: INTEGRATION_FLOW
+                  DeployedBy: Tester
+                  DeployedOn: /Date(1523008750999)/
+                  Status: ERROR
+                  ErrorInformation:
+                    __deferred:
+                      uri: https://sandbox.api.sap.com/cpi/api/v1/IntegrationRuntimeArtifacts('IntegrationFlow_FAILED_DEPLOYMENT')/ErrorInformation
+        default:
+          $ref: '#/responses/error'
+    post:
+      description: __This method is NOT SUPPORTED in CF__. Please use DeployIntegrationDesigntimeArtifact API in the Integration Flow section!
+      summary: Deploy an integration artifact.
+      tags:
+      - Runtime Artifacts
+      parameters:
+      - name: IntegrationRuntimeArtifact
+        in: body
+        schema:
+          $ref: '#/definitions/com.sap.hci.api.IntegrationRuntimeArtifact.Placeholder'
+        description: Integration artifact which should be deployed
+        required: true
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      responses:
+        '202':
+          description: Deployment triggered for integration artifact
+        '400':
+          description: Bad request - request body does not contain the expected archive file of an integration flow.
+        '403':
+          $ref: '#/responses/403'
+  /IntegrationRuntimeArtifacts/$count:
+    get:
+      description: You can use the following request to get the number of all deployed integration artifacts.
+      summary: Get number of deployed integration artifacts.
+      tags:
+      - Runtime Artifacts
+      parameters:
+      - name: $filter
+        in: query
+        description: |-
+          Filter the returned count by property values (not possible for DeployedOn). No nesting possible. Only logical operator ```or``` is allowed. <br>
+          Example1: ```Status eq 'ERROR'``` returns all deployed integration artifacts in status 'ERROR'.<br>
+          Example2: ```Status eq 'ERROR' or Version eq '1.0.0'```
+        type: string
+      responses:
+        '200':
+          description: Number of deployed integration artifacts
+        default:
+          $ref: '#/responses/error'
+  /IntegrationRuntimeArtifacts('{Id}'):
+    get:
+      description: |-
+        You can use the following request to get a deployed integration artifact by Id.<br>
+        In API sandbox integration flows with following Ids are deployed:
+        * '__IntegrationFlow_FAILED_DEPLOYMENT__' with deployment error information
+        * '__IntegrationFlow_MessageStore_COMPLETED_PROCESSING__' with attachments and message store entries
+        * '__IntegrationFlow_AdapterData_FAILED_PROCESSING__' with message processing log error information, attachments, custom header properties and adapter data
+      summary: Get a deployed integration artifact by Id.
+      tags:
+      - Runtime Artifacts
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of deployed integration artifact <br>
+          Example: ```IntegrationFlow_MessageStore_COMPLETED_PROCESSING```
+        type: string
+      responses:
+        '200':
+          description: Retrieved entity
+          schema:
+            title: IntegrationRuntimeArtifact
+            type: object
+            properties:
+              d:
+                $ref: '#/definitions/com.sap.hci.api.IntegrationRuntimeArtifact'
+          examples:
+            application/json:
+              d:
+                Id: IntegrationFlow_MessageStore_COMPLETED_PROCESSING
+                Version: 1.0.0
+                Name: Integration Flow with MessageStore - COMPLETED PROCESSING
+                Type: INTEGRATION_FLOW
+                DeployedBy: Tester
+                DeployedOn: /Date(1521463557739)/
+                Status: STARTED
+                ErrorInformation:
+                  __deferred:
+                    uri: https://sandbox.api.sap.com/cpi/api/v1/IntegrationRuntimeArtifacts('IntegrationFlow_MessageStore_COMPLETED_PROCESSING')/ErrorInformation
+        default:
+          $ref: '#/responses/error'
+    delete:
+      description: |-
+        You can use the following request to undeploy an integration artifact.<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to undeploy an integration artifact.
+      summary: Undeploy an integration artifacts.
+      tags:
+      - Runtime Artifacts
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of deployed integration artifact <br>
+          Example: ```IntegrationFlow_MessageStore_COMPLETED_PROCESSING```
+        type: string
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '202':
+          description: Artifact is triggered for undeployment
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Not found - integration flow with given Id is not deployed.
+  /IntegrationRuntimeArtifacts('{Id}')/ErrorInformation/$value:
+    get:
+      description: |-
+        You can use the following request to get error information of a deployed integration artifact by Id.<br>
+
+        In API sandbox only the deployed integration flow with Id '__IntegrationFlow_FAILED_DEPLOYMENT__' provides the required error information.
+      summary: Get error information of a deployed integration artifact.
+      tags:
+      - Error Information of Runtime Artifact
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of deployed integration artifact <br>
+          Example: ```IntegrationFlow_FAILED_DEPLOYMENT```
+        type: string
+      responses:
+        '200':
+          description: Retrieved error information for integration artifact
+        default:
+          $ref: '#/responses/error'
+  /ServiceEndpoints:
+    get:
+      description: 'You can use the following request to get all endpoints provided for deployed integration flows.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [SAP Cloud Integration - OData API for accessing the service endpoints](https://blogs.sap.com/2019/03/25/sap-cloud-platform-integration-odata-api-for-accessing-the-service-endpoints/).'
+      summary: Get endpoints of integration flows.
+      tags:
+      - Endpoints of Runtime Artifacts
+      parameters:
+      - $ref: '#/parameters/top'
+      - $ref: '#/parameters/skip'
+      - name: $filter
+        in: query
+        description: |-
+          Returns a subset of the entries, which matches the filter condition.<br>
+          Example: ```Name eq 'IntegrationFlowWithConfiguration'``` provides all endpoints of the deployed integration flow with the ID IntegrationFlowWithConfiguration.<br>
+          Example: ```Protocol eq 'SOAP'``` provides all endpoints of the deployed integration flows with SOAP protocol type.
+        type: string
+      - name: $select
+        in: query
+        description: Select properties to be returned.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - Name
+          - Id
+          - Title
+          - Version
+          - Summary
+          - Description
+          - LastUpdated
+          - Protocol
+          - EntryPoints
+          - ApiDefinitions
+      - name: $expand
+        in: query
+        description: Expand related entities.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - EntryPoints
+          - ApiDefinitions
+      - $ref: '#/parameters/inlinecount'
+      - name: $format
+        in: query
+        description: Response format can be JSON or XML.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - json
+          - xml
+        default: json
+      responses:
+        '200':
+          description: Retrieved endpoints of the deployed integration flows
+          schema:
+            title: Collection of endpoints
+            type: object
+            properties:
+              value:
+                type: array
+                items:
+                  $ref: '#/definitions/com.sap.hci.api.ServiceEndpoint'
+          examples:
+            application/json:
+              d:
+                results:
+                - Name: IntegrationFlowWithConfiguration
+                  Id: IntegrationFlowWithConfiguration$endpointAddress=SenderSystem_123
+                  Title: IntegrationFlowWithConfiguration
+                  Version: 1.0.5
+                  Summary: Integration Flow with Configuration
+                  Description: Integration Flow with Configuration
+                  LastUpdated: /Date(1560491841916)/
+                  Protocol: SOAP
+                  EntryPoints:
+                    __deferred:
+                      uri: https://sandbox.api.sap.com:443/cpi/api/v1/ServiceEndpoints('IntegrationFlowWithConfiguration%24endpointAddress%3DSenderSystem_123')/EntryPoints
+                  ApiDefinitions:
+                    __deferred:
+                      uri: https://sandbox.api.sap.com:443/cpi/api/v1/ServiceEndpoints('IntegrationFlowWithConfiguration%24endpointAddress%3DSenderSystem_123')/ApiDefinitions
+                - Name: IntegrationFlowWithConfiguration2
+                  Id: IntegrationFlowWithConfiguration2$endpointAddress=SenderSystem_ABC
+                  Title: IntegrationFlowWithConfiguration2
+                  Version: 1.0.5
+                  Summary: Integration Flow with Configuration 2
+                  Description: Integration Flow with Configuration 2
+                  LastUpdated: /Date(1552576139871)/
+                  Protocol: AS2
+                  EntryPoints:
+                    __deferred:
+                      uri: https://sandbox.api.sap.com:443/cpi/api/v1/ServiceEndpoints('IntegrationFlowWithConfiguration2%24endpointAddress%3DSenderSystem_ABC')/EntryPoints
+                  ApiDefinitions:
+                    __deferred:
+                      uri: https://sandbox.api.sap.com:443/cpi/api/v1/ServiceEndpoints('IntegrationFlowWithConfiguration2%24endpointAddress%3DSenderSystem_ABC')/ApiDefinitions
+        default:
+          $ref: '#/responses/error'
+  /ServiceEndpoints/$count:
+    get:
+      description: 'You can use the following request to get the number of all endpoints provided for deployed integration flows.<br>For further details, refer to the SAP Help Portal documentation [OData API: Integration Content](https://help.sap.com/viewer/368c481cd6954bdfa5d0435479fd4eaf/Cloud/en-US/d1679a80543f46509a7329243b595bdb.html) and to the following SAP Community blog [SAP Cloud Integration - OData API for accessing the service endpoints](https://blogs.sap.com/2019/03/25/sap-cloud-platform-integration-odata-api-for-accessing-the-service-endpoints/).'
+      summary: Get number of endpoints.
+      tags:
+      - Endpoints of Runtime Artifacts
+      parameters:
+      - name: $filter
+        in: query
+        description: |-
+          Returns a subset of the entries, which matches the filter condition.<br>
+          Example: ```Name eq 'IntegrationFlowWithConfiguration'``` provides all endpoints of the deployed integration flow with the ID IntegrationFlowWithConfiguration.<br>
+          Example: ```Protocol eq 'SOAP'``` provides all endpoints of the deployed integration flows with SOAP protocol type.
+        type: string
+      responses:
+        '200':
+          description: Number of retrieved endpoints for deployed integration flows
+        default:
+          $ref: '#/responses/error'
+  /ValueMappingDesigntimeArtifacts:
+    get:
+      description: You can use the following request to get all Value Mappings in the tenant.
+      summary: Get all value mappings.
+      tags:
+      - Value Mappings
+      parameters:
+      - $ref: '#/parameters/top'
+      - $ref: '#/parameters/skip'
+      - name: $select
+        in: query
+        description: Select properties to be returned.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - Id
+          - Version
+          - PackageId
+          - Name
+          - Description
+          - ArtifactContent
+      - name: $orderby
+        in: query
+        description: 'Order items by property values, see [Orderby System Query Option](https://www.odata.org/documentation/odata-version-2-0/uri-conventions/). Default order: by ''Name'' ascending'
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum:
+          - Name
+          - Name desc
+      responses:
+        '200':
+          description: Retrieved value mapping
+          schema:
+            title: Value Mapping
+            type: object
+            properties:
+              value:
+                type: array
+                items:
+                  $ref: '#/definitions/com.sap.hci.api.ValueMappingDesigntimeArtifact'
+          examples:
+            application/json:
+              d:
+                results:
+                - Id: ValueMapping1
+                  Version: 1.0.0
+                  PackageId: MyPackage
+                  Name: ValueMapping1
+                  Description: Value Mapping for test
+                  ArtifactContent: ''
+                - Id: ValueMapping2
+                  Version: 1.1.0
+                  PackageId: MyPackage
+                  Name: ValueMapping2
+                  Description: Value Mapping for test
+                  ArtifactContent: ''
+        '500':
+          description: Internal server error - the requested operation led to an error during execution.
+          schema:
+            $ref: '#/definitions/odata.error'
+    post:
+      description: "You can use the following request to upload a value mapping of designtime. \nIn API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to upload value mappings of designtime."
+      summary: Upload a value mapping.
+      tags:
+      - Value Mappings
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: ValueMapping
+        in: body
+        description: |-
+          New value mapping requires name and package Id. <br>
+          The name should begin with alphabetic character or underscore ```_``` and can also contain numbers, space, period ```.``` or hyphen ```-```. But it should not end with period ```.```.<br>
+          The artifact content is only required, if value mapping zip content in base64-encoded format should be uploaded.
+        schema:
+          $ref: '#/definitions/com.sap.hci.api.ValueMappingDesigntimeArtifact-create'
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '201':
+          description: Value mapping flow successfully created.
+          schema:
+            title: New ValueMappingDesigntimeArtifact
+            type: object
+            properties:
+              d:
+                $ref: '#/definitions/com.sap.hci.api.ValueMappingDesigntimeArtifact'
+          examples:
+            application/json:
+              d:
+                Id: ValueMappingWithConfiguration
+                Version: 1.0.0
+                PackageId: PackageforTest
+                Name: Configuration Integration Flow
+                Description: ' '
+        '400':
+          description: Bad request - wrong name or body is not provided in the expected JSON format.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: Name should begin with alphabet or underscore (_) and can also contain numbers, space, period(.) or hyphen(-). But it should not end with period(.)
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Not found - package Id does not exist.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Package ID TestPackage123 does not exist.
+        '500':
+          description: Internal server error - possibly an value mapping with the same Id already exists.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Internal Server Error
+                message:
+                  lang: en
+                  value: A value mapping with Configuration with the ID IntegrationFlowWithConfiguration already exists in the Cloud Integration API Test Package package. Please rename the artifact ID.
+  /ValueMappingDesigntimeArtifacts(Id='{Id}',Version='{Version}'):
+    get:
+      description: You can use the following request to get a specific Value Mapping in the tenant.
+      summary: Get specific Value Mapping.
+      tags:
+      - Value Mappings
+      parameters:
+      - name: Id
+        in: path
+        description: |-
+          Id of the value mapping <br>
+          Example: ```ValueMapping1```
+        type: string
+        required: true
+      - name: Version
+        in: path
+        description: |-
+          Version of the value mapping <br>
+          Example: ```active```
+        type: string
+        required: true
+        default: active
+      responses:
+        '200':
+          description: Retrieved value mapping
+          schema:
+            title: Value Mapping
+            type: object
+            properties:
+              value:
+                type: array
+                items:
+                  $ref: '#/definitions/com.sap.hci.api.ValueMappingDesigntimeArtifact'
+          examples:
+            application/json:
+              d:
+                results:
+                - Id: ValueMapping1
+                  Version: 1.0.0
+                  PackageId: MyPackage
+                  Name: ValueMapping1
+                  Description: Value Mapping for test
+                  ArtifactContent: ''
+        '404':
+          description: Not Found
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Value Mapping with Id:ValueMapping1 and Version:acti not found
+        '500':
+          description: Internal server error - the requested operation led to an error during execution.
+          schema:
+            $ref: '#/definitions/odata.error'
+  /ValueMappingDesigntimeArtifacts(Id='{Id}',Version='{Version}')/$value:
+    get:
+      description: "You can use the following request to download a value mapping of designtime as zip file. Value mappings of configure-only packages cannot be downloaded. \nIn API sandbox the following designtime integration flows with Id and version are available:\n* '__IntegrationFlow_FAILED_DEPLOYMENT__' with version '__1.0.0__' \n* '__IntegrationFlow_MessageStore_COMPLETED_PROCESSING__' with version '__1.0.0__'\n* '__IntegrationFlow_AdapterData_FAILED_PROCESSING__' with version '__1.0.0__'\n* '__IntegrationFlowWithConfiguration__' with version '__1.0.5__'"
+      summary: Download an integration flow as zip file.
+      tags:
+      - Value Mappings
+      produces:
+      - application/zip
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of the value mapping <br>
+          Example: ```ValueMapping1```
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of the value mapping  <br>
+          You can enter either ```active``` or the version name (e.g. ```1.0.5```) for retrieving the current version.
+        type: string
+        default: active
+      responses:
+        '200':
+          description: Retrieved entity
+          schema:
+            type: file
+        '500':
+          description: Internal server error - the requested operation led to an error during execution.
+          schema:
+            $ref: '#/definitions/odata.error'
+  /DeployValueMappingDesigntimeArtifact:
+    post:
+      description: |-
+        You can use the following request to deploy a value mapping of designtime.<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to deploy value mappings from designtime.
+      summary: Deploy a value mapping.
+      tags:
+      - Value Mappings
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: query
+        required: true
+        description: |-
+          Id of value mapping artifact - enclosed in single quotes <br>
+          Example: ```'ValueMapping1'```
+        type: string
+      - name: Version
+        in: query
+        required: true
+        description: |-
+          Version of value mapping artifact - enclosed in single quotes  <br>
+          You can enter either ```'active'``` or the version name (e.g. ```'1.0.5'```) for retrieving the current version.
+        type: string
+        default: '''active'''
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '202':
+          description: Deployment triggered for value mapping artifact of designtime.
+        '400':
+          description: Bad request - wrong Id or version or single quotes are missing.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: No content for id 'TestValueMapping'.
+        '403':
+          $ref: '#/responses/403'
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Internal Server Error
+                message:
+                  lang: en
+                  value: <error text>
+  /ValueMappingDesigntimeArtifactSaveAsVersion:
+    post:
+      description: |-
+        You can use the following request to update an artifact with new specified version.<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to update value mappings from designtime.
+      summary: Update an artifact with version.
+      tags:
+      - Integration Flow
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: query
+        required: true
+        description: |-
+          Id of value mapping artifact <br>
+          Example: ```ValueMapping1```
+        type: string
+      - name: SaveAsVersion
+        in: query
+        required: true
+        description: |-
+          New version of value mapping artifact <br>
+           (e.g. ```1.0.5```).
+        type: string
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '200':
+          description: Success
+        '400':
+          $ref: '#/responses/400'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Value Mapping design time artifact not found.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Value Mapping design time artifact not found.
+  /ValueMappingDesigntimeArtifacts(Id='{Id}',Version='{Version}')/ValMapSchema:
+    get:
+      description: You can use the following request to get all bidirectional agency identifiers in the Value Mapping.
+      summary: Get all Value Mapping agency identifiers.
+      tags:
+      - Value Mappings
+      parameters:
+      - name: Id
+        in: path
+        description: |-
+          Id of integration artifact <br>
+          Example: ```ValueMapping1```
+        type: string
+        required: true
+      - name: Version
+        in: path
+        description: |-
+          Version of the integration artifact<br>
+          Example: ```active```
+        type: string
+        required: true
+        default: active
+      - name: $filter
+        in: query
+        description: |-
+          Returns a subset of the entries, which matches the filter condition. The only supported expression is:.<br>
+          ```State eq 'Configured'```<br>
+           It provides all the bidirectional agency identifiers that are in configured state.
+        type: string
+      responses:
+        '200':
+          description: Retrieved agency identifiers of the value mapping
+          schema:
+            title: Value Mapping
+            type: object
+            properties:
+              value:
+                type: array
+                items:
+                  $ref: '#/definitions/com.sap.hci.api.ValMapSchema'
+          examples:
+            application/json:
+              d:
+                results:
+                - SrcAgency: SourceAgency
+                  SrcId: SrcId
+                  TgtAgency: TargetAgency
+                  TgtId: TgtId
+                  State: ''
+                - SrcAgency: TargetAgency
+                  SrcId: TgtId
+                  TgtAgency: SourceAgency
+                  TgtId: SrcId
+                  State: ''
+        '404':
+          description: Not Found
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Value Mapping with Id:ValueMapping1 and Version:acti not found
+        '500':
+          description: Internal server error - the requested operation led to an error during execution.
+          schema:
+            $ref: '#/definitions/odata.error'
+  ? /ValueMappingDesigntimeArtifacts(Id='{Id}',Version='{Version}')/ValMapSchema(SrcAgency='{SrcAgency}',SrcId='{SrcId}',TgtAgency='{TgtAgency}',TgtId='{TgtId}')/ValMaps
+  : get:
+      description: You can use the following request to get all the value mappings for a specific bidirectional agency identifier.
+      summary: Get all Value Mappings for specific agency identifiers.
+      tags:
+      - Value Mappings
+      parameters:
+      - name: Id
+        in: path
+        description: |-
+          Id of integration artifact Value mapping<br>
+          Example: ```ValueMapping1```
+        type: string
+        required: true
+      - name: Version
+        in: path
+        description: |-
+          Version of the integration artifact Value Mapping<br>
+          Example: ```active```
+        type: string
+        required: true
+        default: active
+      - name: SrcAgency
+        in: path
+        description: |-
+          Source Agency<br>
+          Example: ```SourceAgency```
+        type: string
+        required: true
+      - name: SrcId
+        in: path
+        description: |-
+          Source Id<br>
+          Example: ```SrcId```
+        type: string
+        required: true
+      - name: TgtAgency
+        in: path
+        description: |-
+          Target Agency<br>
+          Example: ```TargetAgency```
+        type: string
+        required: true
+      - name: TgtId
+        in: path
+        description: |-
+          Target Id<br>
+          Example: ```TgtId```
+        type: string
+        required: true
+      - name: $filter
+        in: query
+        description: |-
+          Returns a subset of the entries, which matches the filter condition.<br>
+          Example: ```Value/SrcValue eq 'SourceValue' and Value/TgtValue eq 'TargetValue'``` provides all the value mappings based on the source and target value for a specific bidirectional agency identifier.
+        type: string
+      responses:
+        '200':
+          description: Retrieved value mappings for specific agency identifiers
+          schema:
+            title: Value Mapping
+            type: object
+            properties:
+              value:
+                type: array
+                items:
+                  $ref: '#/definitions/com.sap.hci.api.ValMaps'
+          examples:
+            application/json:
+              d:
+                results:
+                - Id: 6e903c8038295984242f94cf9dc04b54
+                  Value:
+                  - SrcValue: Source1
+                    TgtValue: Target1
+        '404':
+          description: Not Found
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Could not find source agency:SourceAgenc, source identifier:SrcId, target agency:TargetAgency and target identifier:TgtId
+        '500':
+          description: Internal server error - the requested operation led to an error during execution.
+          schema:
+            $ref: '#/definitions/odata.error'
+  ? /ValueMappingDesigntimeArtifacts(Id='{Id}',Version='{Version}')/ValMapSchema(SrcAgency='{SrcAgency}',SrcId='{SrcId}',TgtAgency='{TgtAgency}',TgtId='{TgtId}')/DefaultValMaps
+  : get:
+      description: You can use the following request to get all the default value mappings for a specific bidirectional agency identifier.
+      summary: Get all Default Value Mappings for specific agency identifiers.
+      tags:
+      - Value Mappings
+      parameters:
+      - name: Id
+        in: path
+        description: |-
+          Id of integration artifact Value mapping<br>
+          Example: ```ValueMapping1```
+        type: string
+        required: true
+      - name: Version
+        in: path
+        description: |-
+          Version of the integration artifact Value Mapping<br>
+          Example: ```active```
+        type: string
+        required: true
+        default: active
+      - name: SrcAgency
+        in: path
+        description: |-
+          Source Agency<br>
+          Example: ```SourceAgency```
+        type: string
+        required: true
+      - name: SrcId
+        in: path
+        description: |-
+          Source Id<br>
+          Example: ```SrcId```
+        type: string
+        required: true
+      - name: TgtAgency
+        in: path
+        description: |-
+          Target Agency<br>
+          Example: ```TargetAgency```
+        type: string
+        required: true
+      - name: TgtId
+        in: path
+        description: |-
+          Target Id<br>
+          Example: ```TgtId```
+        type: string
+        required: true
+      responses:
+        '200':
+          description: Retrieved value mappings for specific agency identifiers
+          schema:
+            title: Value Mapping
+            type: object
+            properties:
+              value:
+                type: array
+                items:
+                  $ref: '#/definitions/com.sap.hci.api.ValMaps'
+          examples:
+            application/json:
+              d:
+                results:
+                - Id: 6e903c8038295984242f94cf9dc04b54
+                  Value:
+                  - SrcValue: Source1
+                    TgtValue: Target1
+        '404':
+          description: Not Found
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Could not find source agency:SourceAgenc, source identifier:SrcId, target agency:TargetAgency and target identifier:TgtId
+        '500':
+          description: Internal server error - the requested operation led to an error during execution.
+          schema:
+            $ref: '#/definitions/odata.error'
+  /UpsertValMaps:
+    post:
+      description: |-
+        You can use the following request to create a value mapping using function import UpsertValMaps.<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to create value mappings of designtime.
+      summary: Create new value mapping.
+      tags:
+      - Value Mappings
+      parameters:
+      - name: Id
+        in: query
+        description: |
+          Id of value mappping artifact.<br>
+          Example: ```'ValueMapping1'```.<br>
+        type: string
+        required: true
+      - name: Version
+        in: query
+        description: |-
+          Version of the value mapping artifact.<br>
+          Example: ```'active'```.<br>
+        type: string
+        required: true
+      - name: SrcAgency
+        in: query
+        description: |
+          Source Agency.<br>
+          Example: ```'SourceAgency'```.<br>
+        type: string
+        required: true
+      - name: SrcId
+        in: query
+        description: |
+          Source Id.<br>
+          Example: ```'123'```.<br>
+        type: string
+        required: true
+      - name: TgtAgency
+        in: query
+        description: |
+          Target Agency.<br>
+          Example: ```'TargetAgency'```.<br>
+        type: string
+        required: true
+      - name: TgtId
+        in: query
+        description: |
+          Target Id.<br>
+          Example: ```'456'```.<br>
+        type: string
+        required: true
+      - name: SrcValue
+        in: query
+        description: |
+          Source Value.<br>
+          Example: ```'John'```.<br>
+        type: string
+        required: true
+      - name: TgtValue
+        in: query
+        description: |
+          Target Value.<br>
+          Example: ```'Jan'```.<br>
+        type: string
+        required: true
+      - name: IsConfigured
+        in: query
+        description: 'Boolean value: true or false'
+        type: string
+        required: true
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '202':
+          description: Accepted
+        '400':
+          description: Bad request.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: Source and Target value already exist
+        '404':
+          description: Not Found
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Could not find source agency:SourceAgency, source identifier:123, target agency:TargetAgency and target identifier:456
+        '500':
+          description: Internal server error - the requested operation led to an error during execution.
+          schema:
+            $ref: '#/definitions/odata.error'
+  /UpdateDefaultValMap:
+    post:
+      description: |-
+        You can use the following request to update a default value mapping in the value mapping artifact.<br>
+
+        In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to create value mappings of designtime.
+      summary: Update default value mapping in value mapping artifact.
+      tags:
+      - Value Mappings
+      parameters:
+      - name: Id
+        in: query
+        description: |
+          Id of value mappping artifact.<br>
+          Example: ```'ValueMapping1'```.<br>
+        type: string
+        required: true
+      - name: Version
+        in: query
+        description: |
+          Version of the value mapping artifact.<br>
+          Example: ```'active'```.<br>
+        type: string
+        required: true
+      - name: SrcAgency
+        in: query
+        description: |
+          Source Agency.<br>
+          Example: ```'SourceAgency'```.<br>
+        type: string
+        required: true
+      - name: SrcId
+        in: query
+        description: |
+          Source Id.<br>
+          Example: ```'123'```.<br>
+        type: string
+        required: true
+      - name: TgtAgency
+        in: query
+        description: |
+          Target Agency.<br>
+          Example: ```'TargetAgency'```.<br>
+        type: string
+        required: true
+      - name: TgtId
+        in: query
+        description: |
+          Target Id.<br>
+          Example: ```'456'```.<br>
+        type: string
+        required: true
+      - name: IsConfigured
+        in: query
+        description: 'Boolean value: true or false'
+        type: string
+        required: true
+      - name: ValMapId
+        in: query
+        description: Value Mapping Id
+        type: string
+        required: true
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '202':
+          description: Accepted
+        '400':
+          description: Bad request.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: Not enough target instances to create default.
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Not Found
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: No such value mapping id:ValueMapping1 found
+        '500':
+          description: Internal server error - the requested operation led to an error during execution.
+          schema:
+            $ref: '#/definitions/odata.error'
+  /IntegrationAdapterDesigntimeArtifacts:
+    post:
+      description: |-
+        You can use the following request to import an integration adapter designtime artifact.<br>
+
+        This API is available only in Cloud Foundry environment. In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to import adapters of designtime.
+      summary: Import integration adapter designtime artifact.
+      tags:
+      - Integration Adapter
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: IntegrationAdapter
+        in: body
+        description: Package Id in which adapter needs to be imported.
+        schema:
+          $ref: '#/definitions/com.sap.hci.api.IntegrationAdapterDesigntimeArtifact-import'
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '201':
+          description: Integration adapter successfully imported.
+          schema:
+            title: New IntegrationAdapterDesigntimeArtifact
+            type: object
+            properties:
+              d:
+                $ref: '#/definitions/com.sap.hci.api.IntegrationAdapterDesigntimeArtifact'
+          examples:
+            application/json:
+              d:
+                Id: IntegrationAdapterId
+                Version: 1.0.0
+                PackageId: PackageforTest
+                Name: My Integration Adapter
+                ArtifactContent: ' '
+        '400':
+          description: Bad request - parameter missing or body is not provided accordingly.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: PackageId must not be empty
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Not found - package Id does not exist.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Package ID TestPackage123 does not exist.
+        '500':
+          description: Internal server error - possibly an integration adapter with the same Id already exists.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Internal Server Error
+                message:
+                  lang: en
+                  value: An integration adapter with the ID IntegrationAdapter already exists in the package PackageforTest. Please rename the artifact ID.
+  /DeployIntegrationAdapterDesigntimeArtifact:
+    post:
+      description: |-
+        You can use the following request to deploy an integration adapter of designtime.<br>
+
+        This API is available only in Cloud Foundry environment. In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to deploy integration adapter from designtime.
+      summary: Deploy an integration adapter.
+      tags:
+      - Integration Adapter
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: query
+        required: true
+        description: |-
+          Id of integration adapter artifact - enclosed in single quotes <br>
+          Example: ```'IntegrationAdapterId'```
+        type: string
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '202':
+          description: Deployment triggered for integration adapter of designtime.
+        '400':
+          description: Bad request - Id missing or single quotes are missing.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: Missing parameter
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Not found - the artifact with the given Id does not exist.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not found
+                message:
+                  lang: en
+                  value: Integration adapter with id IntegrationAdapterId does not exist.
+        '500':
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Internal Server Error
+                message:
+                  lang: en
+                  value: <error text>
+  /IntegrationAdapterDesigntimeArtifacts(Id='{Id}'):
+    delete:
+      description: |-
+        You can use the following request to delete an integration adapter from designtime. <br>
+
+        This API is available only in Cloud Foundry environment. In API sandbox only read APIs could be tested. You need to configure an API endpoint for your account, where you have the required write permissions to delete integration adapter from designtime.
+      summary: Delete an integration adapter.
+      tags:
+      - Integration Adapter
+      produces:
+      - application/json
+      consumes:
+      - application/json
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration adapter artifact <br>
+          Example: ```IntegrationAdapterId```
+        type: string
+      - description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling')
+        in: header
+        name: X-CSRF-Token
+        type: string
+        required: true
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad request - Invalid key or artifact is locked.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Bad Request
+                message:
+                  lang: en
+                  value: Cannot delete the artifact as it is locked.
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          description: Not found - integration adapter with given Id does not exist.
+          schema:
+            $ref: '#/definitions/odata.error'
+          examples:
+            application/json:
+              error:
+                code: Not Found
+                message:
+                  lang: en
+                  value: Integration adapter with id IntegrationAdapterId does not exist.
+  /:
+    get:
+      tags:
+      - CSRF Token Handling
+      produces:
+      - application/json
+      description: |-
+        You can use the following request to get the CSRF token for this session, which is required for write access via POST, PUT and DELETE operations. Copy the received X-CSRF-Token from the response header.<br>
+
+        **In API sandbox this request is not relevant!**
+      summary: Get CSRF token.
+      parameters:
+      - description: To retrieve a new CSRF token the value of the header must be set to ```Fetch```.
+        in: header
+        name: X-CSRF-Token
+        required: true
+        type: string
+        default: Fetch
+      responses:
+        '200':
+          description: The header provides the CSRF token for this session.
+          headers:
+            X-CSRF-Token:
+              description: CSRF token that can be used for all modifying requests within the same session.
+              type: string
+        default:
+          $ref: '#/responses/error'
+definitions:
+  com.sap.hci.api.IntegrationRuntimeArtifact:
+    type: object
+    properties:
+      Id:
+        type:
+        - string
+        - 'null'
+      Version:
+        type:
+        - string
+        - 'null'
+      Name:
+        type:
+        - string
+        - 'null'
+      Type:
+        type:
+        - string
+        - 'null'
+      DeployedBy:
+        type:
+        - string
+        - 'null'
+      DeployedOn:
+        type:
+        - string
+        - 'null'
+        format: date-time
+        example: '2017-04-13T15:51:04'
+      Status:
+        type:
+        - string
+        - 'null'
+      ErrorInformation:
+        $ref: '#/definitions/com.sap.hci.api.RuntimeArtifactErrorInformation'
+    title: IntegrationRuntimeArtifact
+  com.sap.hci.api.IntegrationRuntimeArtifact.Placeholder:
+    type: object
+    properties:
+      BinaryFile:
+        type:
+        - string
+        - 'null'
+    title: IntegrationRuntimeArtifactPlaceholder
+  com.sap.hci.api.IntegrationRuntimeArtifact_Request:
+    type: object
+    properties:
+      Id:
+        type:
+        - string
+        - 'null'
+      Version:
+        type:
+        - string
+        - 'null'
+      Name:
+        type:
+        - string
+        - 'null'
+      Type:
+        type:
+        - string
+        - 'null'
+    title: IntegrationRuntimeArtifact_Request
+  com.sap.hci.api.RuntimeArtifactErrorInformation:
+    type: object
+    properties:
+      Id:
+        type:
+        - string
+        - 'null'
+    title: RuntimeArtifactErrorInformation
+  com.sap.hci.api.IntegrationDesigntimeArtifact:
+    type: object
+    properties:
+      Id:
+        type:
+        - string
+        - 'null'
+      Version:
+        type:
+        - string
+        - 'null'
+      PackageId:
+        type:
+        - string
+        - 'null'
+      Name:
+        type:
+        - string
+        - 'null'
+      Description:
+        type:
+        - string
+        - 'null'
+      ArtifactContent:
+        type:
+        - string
+        - 'null'
+        format: base64url
+      Configurations:
+        title: Collection of Configuration
+        type: object
+        properties:
+          results:
+            type: array
+            items:
+              $ref: '#/definitions/com.sap.hci.api.Configuration'
+      Resources:
+        title: Collection of Resource
+        type: object
+        properties:
+          results:
+            type: array
+            items:
+              $ref: '#/definitions/com.sap.hci.api.Resource'
+    title: IntegrationDesigntimeArtifact
+  com.sap.hci.api.IntegrationDesigntimeArtifact-create:
+    type: object
+    properties:
+      Name:
+        type: string
+      Id:
+        type: string
+      PackageId:
+        type: string
+      ArtifactContent:
+        type:
+        - string
+        - 'null'
+        format: base64url
+        example: integration flow zip content in base64-encoded format
+    title: IntegrationDesigntimeArtifact (for creation)
+  com.sap.hci.api.IntegrationDesigntimeArtifact-update:
+    type: object
+    properties:
+      Name:
+        type: string
+      ArtifactContent:
+        type:
+        - string
+        - 'null'
+        format: base64url
+        example: integration flow zip content in base64-encoded format
+    title: IntegrationDesigntimeArtifact (for update)
+  com.sap.hci.api.Configuration:
+    type: object
+    properties:
+      ParameterKey:
+        type: string
+      ParameterValue:
+        type: string
+      DataType:
+        type: string
+    title: Configuration
+  com.sap.hci.api.Configuration-update:
+    type: object
+    properties:
+      ParameterValue:
+        type: string
+        example: new value
+      DataType:
+        type: string
+        example: xsd:integer
+    title: Configuration (for update)
+  com.sap.hci.api.Resource:
+    type: object
+    properties:
+      Name:
+        type: string
+        example: file name
+      ResourceType:
+        type: string
+        example: edmx/groovy/jar/js/mmap/opmap/wsdl/xsd/xslt
+      ReferencedResourceType:
+        type:
+        - string
+        - 'null'
+        example: ''
+      ResourceContent:
+        type:
+        - string
+        - 'null'
+        format: base64url
+        example: resource in base64 encoded format
+    title: Resource
+  com.sap.hci.api.Resource-create:
+    type: object
+    properties:
+      Name:
+        type: string
+        example: file name
+      ResourceType:
+        type: string
+        example: edmx/groovy/jar/js/mmap/opmap/wsdl/xsd/xslt
+      ReferencedResourceType:
+        type:
+        - string
+        - 'null'
+        example: ''
+      ResourceContent:
+        type:
+        - string
+        - 'null'
+        format: base64url
+        example: resource in base64 encoded format
+    title: Resource (for create)
+  com.sap.hci.api.Resource-update:
+    type: object
+    properties:
+      ResourceContent:
+        type: string
+        format: base64url
+        example: resource in base64 encoded format
+    title: Resource (for update)
+  com.sap.hci.api.ServiceEndpoint:
+    type: object
+    properties:
+      Name:
+        type:
+        - string
+        - 'null'
+        example: string
+      Id:
+        type: string
+      Title:
+        type: string
+      Version:
+        type: string
+      Summary:
+        type: string
+      Description:
+        type: string
+      LastUpdated:
+        type:
+        - string
+        - 'null'
+        format: date-time
+        example: '2017-04-13T15:51:04Z'
+      Protocol:
+        type: string
+        example: AS2, AS4, ODATAV2, SOAP
+      EntryPoints:
+        type: array
+        items:
+          $ref: '#/definitions/com.sap.hci.api.EntryPoint'
+      ApiDefinitions:
+        type: array
+        items:
+          $ref: '#/definitions/com.sap.hci.api.Definition'
+    title: ServiceEndpoint
+  com.sap.hci.api.EntryPoint:
+    type: object
+    properties:
+      Name:
+        type: string
+      Url:
+        type: string
+      Type:
+        type:
+        - string
+        - 'null'
+        example: string
+      AdditionalInformation:
+        type:
+        - string
+        - 'null'
+        example: string
+    title: EntryPoint
+  com.sap.hci.api.Definition:
+    type: object
+    properties:
+      Url:
+        type: string
+      Name:
+        type: string
+    title: APIDefinition
+  com.sap.hci.api.CustomTagsConfiguration-create:
+    type: object
+    properties:
+      customTagsConfiguration:
+        type:
+        - string
+        - 'null'
+        format: base64url
+        example: JSON representation of custom tags definition in base64-encoded format
+    title: CustomTagsConfiguration (for creation)
+  com.sap.hci.api.IntegrationPackage:
+    type: object
+    properties:
+      Id:
+        type: string
+      Name:
+        type: string
+      Description:
+        type:
+        - string
+        - 'null'
+        example: string
+      ShortText:
+        type: string
+      Version:
+        type:
+        - string
+        - 'null'
+        example: string
+      Vendor:
+        type:
+        - string
+        - 'null'
+        example: string
+      Mode:
+        type:
+        - string
+        - 'null'
+        example: string
+      SupportedPlatform:
+        type:
+        - string
+        - 'null'
+        example: SAP Cloud Integration or SAP Process Orchestration or SuccessFactors Integration Center
+      ModifiedBy:
+        type:
+        - string
+        - 'null'
+        example: string
+      CreationDate:
+        type:
+        - string
+        - 'null'
+        example: string
+      ModifiedDate:
+        type:
+        - string
+        - 'null'
+        example: string
+      CreatedBy:
+        type:
+        - string
+        - 'null'
+        example: string
+      Products:
+        type:
+        - string
+        - 'null'
+        example: string
+      Keywords:
+        type:
+        - string
+        - 'null'
+        example: string
+      Countries:
+        type:
+        - string
+        - 'null'
+        example: string
+      Industries:
+        type:
+        - string
+        - 'null'
+        example: string
+      LineOfBusiness:
+        type:
+        - string
+        - 'null'
+        example: string
+      IntegrationDesigntimeArtifacts:
+        type: array
+        items:
+          $ref: '#/definitions/com.sap.hci.api.IntegrationDesigntimeArtifact'
+    title: IntegrationPackage
+  com.sap.hci.api.IntegrationPackage-create:
+    type: object
+    properties:
+      Id:
+        type:
+        - string
+        - 'null'
+        example: string
+      Name:
+        type: string
+      Description:
+        type:
+        - string
+        - 'null'
+        example: string
+      ShortText:
+        type: string
+      Version:
+        type:
+        - string
+        - 'null'
+        example: string
+      SupportedPlatform:
+        type:
+        - string
+        - 'null'
+        example: SAP Cloud Integration or SAP Process Orchestration or SuccessFactors Integration Center
+      Products:
+        type:
+        - string
+        - 'null'
+        example: string
+      Keywords:
+        type:
+        - string
+        - 'null'
+        example: string
+      Countries:
+        type:
+        - string
+        - 'null'
+        example: string
+      Industries:
+        type:
+        - string
+        - 'null'
+        example: string
+      LineOfBusiness:
+        type:
+        - string
+        - 'null'
+        example: string
+    required:
+    - Id
+    title: IntegrationPackage (for create)
+  com.sap.hci.api.IntegrationPackage-update:
+    type: object
+    properties:
+      Name:
+        type: string
+      Description:
+        type:
+        - string
+        - 'null'
+        example: string
+      ShortText:
+        type: string
+      Version:
+        type:
+        - string
+        - 'null'
+        example: string
+      Vendor:
+        type:
+        - string
+        - 'null'
+        example: string
+      Mode:
+        type:
+        - string
+        - 'null'
+        example: string
+      SupportedPlatform:
+        type:
+        - string
+        - 'null'
+        example: SAP Cloud Integration or SAP Process Orchestration or SuccessFactors Integration Center
+      Products:
+        type:
+        - string
+        - 'null'
+        example: string
+      Keywords:
+        type:
+        - string
+        - 'null'
+        example: string
+      Countries:
+        type:
+        - string
+        - 'null'
+        example: string
+      Industries:
+        type:
+        - string
+        - 'null'
+        example: string
+      LineOfBusiness:
+        type:
+        - string
+        - 'null'
+        example: string
+    title: IntegrationPackage (for update)
+  com.sap.hci.api.sandbox.error:
+    type: object
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+  odata.error:
+    type: object
+    required:
+    - error
+    properties:
+      error:
+        $ref: '#/definitions/odata.error.main'
+  odata.error.main:
+    type: object
+    required:
+    - code
+    - message
+    properties:
+      code:
+        type: string
+      message:
+        type: object
+        required:
+        - lang
+        - value
+        properties:
+          lang:
+            type: string
+          value:
+            type: string
+  odata.error.detail:
+    type: object
+    required:
+    - code
+    - message
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+      target:
+        type: string
+  com.sap.hci.api.CustomTags-Update:
+    type: object
+    properties:
+      Value:
+        type: string
+        example: new value
+    title: Custom Tags (for update)
+  com.sap.hci.api.ValueMappingDesigntimeArtifact:
+    type: object
+    properties:
+      Id:
+        type: string
+      Version:
+        type: string
+      PackageId:
+        type: string
+      Name:
+        type: string
+      Description:
+        type: string
+      ArtifactContent:
+        type: string
+    title: ValueMappingDesigntimeArtifact
+  com.sap.hci.api.ValueMappingDesigntimeArtifact-create:
+    type: object
+    properties:
+      Name:
+        type: string
+      Id:
+        type: string
+      PackageId:
+        type: string
+      Description:
+        type: string
+      ArtifactContent:
+        type:
+        - string
+        - 'null'
+        format: base64url
+        example: integration flow zip content in base64-encoded format
+    title: ValueMappingDesigntimeArtifact (for creation)
+  com.sap.hci.api.ValMapSchema:
+    type: object
+    properties:
+      SrcAgency:
+        type: string
+      SrcId:
+        type: string
+      TgtAgency:
+        type: string
+      TgtId:
+        type: string
+      State:
+        type:
+        - string
+        - 'null'
+      DefaultValMaps:
+        title: ValMaps
+        type: object
+        properties:
+          results:
+            type: array
+            items:
+              $ref: '#/definitions/com.sap.hci.api.ValMaps'
+      ValMaps:
+        title: ValMaps
+        type: object
+        properties:
+          results:
+            type: array
+            items:
+              $ref: '#/definitions/com.sap.hci.api.ValMaps'
+    title: ValMapSchema
+  com.sap.hci.api.ValMaps:
+    type: object
+    properties:
+      Id:
+        type: string
+      Value:
+        title: Value
+        type: object
+        properties:
+          results:
+            type: array
+            items:
+              $ref: '#/definitions/com.sap.hci.api.Value'
+    title: ValMaps
+  com.sap.hci.api.Value:
+    type: object
+    properties:
+      SrcValue:
+        type: string
+      TgtValue:
+        type: string
+    title: Value
+  com.sap.hci.api.IntegrationAdapterDesigntimeArtifact:
+    type: object
+    properties:
+      Id:
+        type:
+        - string
+        - 'null'
+      Version:
+        type:
+        - string
+        - 'null'
+      PackageId:
+        type:
+        - string
+        - 'null'
+      Name:
+        type:
+        - string
+        - 'null'
+      ArtifactContent:
+        type:
+        - string
+        - 'null'
+        format: base64url
+        example: integration adapter esa file content in base64-encoded format
+    title: IntegrationAdapterDesigntimeArtifact
+  com.sap.hci.api.IntegrationAdapterDesigntimeArtifact-import:
+    type: object
+    properties:
+      PackageId:
+        type: string
+      ArtifactContent:
+        type:
+        - string
+        - 'null'
+        format: base64url
+        example: integration adapter esa file content in base64-encoded format
+    title: IntegrationAdapterDesigntimeArtifact (for import)
+parameters:
+  top:
+    name: $top
+    in: query
+    description: Show only the first n items.
+    type: integer
+    minimum: 0
+  skip:
+    name: $skip
+    in: query
+    description: Skip the first n items.
+    type: integer
+    minimum: 0
+  count:
+    name: $count
+    in: query
+    description: Include count of items.
+    type: boolean
+  inlinecount:
+    name: $inlinecount
+    in: query
+    description: Count the number of retrieved entries by selecting ```allpages```.
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+      - allpages
+  filter:
+    name: $filter
+    in: query
+    description: Filter items by property values.
+    type: string
+  select:
+    name: $select
+    in: query
+    description: Select specific attributes to be listed in the result.
+    type: string
+responses:
+  '204':
+    description: No content. The server successfully processed the request and is not returning any content
+  '400':
+    description: Bad request - wrong format or structure of the provided request body.
+    schema:
+      $ref: '#/definitions/odata.error'
+  '401':
+    description: Unauthorized - authorization information is missing or invalid.
+    schema:
+      $ref: '#/definitions/odata.error'
+  '403':
+    description: Access forbidden - you did not have the required permissions to access the resource.
+    schema:
+      $ref: '#/definitions/odata.error'
+    examples:
+      application/json:
+        code: Forbidden
+        message:
+          lang: en
+          value: null
+  '404':
+    description: Not found
+    schema:
+      $ref: '#/definitions/odata.error'
+  '500':
+    description: Internal server error - the requested operation led to an error during execution.
+    schema:
+      $ref: '#/definitions/odata.error'
+  UNAUTHORIZED_OPERATION:
+    description: |-
+      Access forbidden - you did not have the required permissions to access the resource.<br>
+
+      In API sandbox any write access is refused.
+    schema:
+      $ref: '#/definitions/com.sap.hci.api.sandbox.error'
+    examples:
+      application/json:
+        code: UNAUTHORIZED_OPERATION
+        message: Sorry! API sandbox only supports the 'Try-it-out' feature for GET operations. To test a write operation, please test the API against your own tenant account of SAP Cloud Integration by configuring the corresponding API endpoint.
+  error:
+    description: Error
+    schema:
+      $ref: '#/definitions/odata.error'
+    examples:
+      application/json:
+        error:
+          code: <error code>
+          message:
+            lang: en
+            value: <error text>

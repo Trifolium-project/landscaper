@@ -1,0 +1,34 @@
+landscape:
+  name: Mercedes-Benz Russia
+  systems:
+    - id: dev
+      name: Development Tenant l450096
+      host: l450096-tmn.hci.ru1.hana.ondemand.com
+      login: DEV_LOGIN_ENV_VAR
+      password: DEV_PASSWORD_ENV_VAR
+    - id: prod
+      name: Production Tenant Trial
+      host: bcaf0b4atrial.it-cpitrial04.cfapps.eu10-002.hana.ondemand.com
+      login: PROD_LOGIN_ENV_VAR
+      password: PROD_PASSWORD_ENV_VAR
+  packages:
+    - id: CheckIntegration
+    - id: CRMIntegrationPackage
+    - id: MarketingIntegrationPackage
+  environments:
+    - id: Dev
+      name: Development Environment
+      suffix: null
+      system: dev
+    - id: QA
+      name: QA Environment
+      suffix: QA
+      system: dev
+    - id: Prod
+      name: Prod Environment
+      suffix: PRD
+      system: prod
+  originalEnvironment: dev
+    
+
+
