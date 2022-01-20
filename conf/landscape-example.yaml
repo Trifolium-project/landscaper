@@ -1,14 +1,15 @@
+#Example of landscape declaration
 landscape:
-  name: Mercedes-Benz Russia
+  name: Acme Corporation integration landscape
   systems:
     - id: dev
-      name: Development Tenant l450096
-      host: l450096-tmn.hci.ru1.hana.ondemand.com
+      name: Development Tenant lxxxxxx
+      host: exxxxxx-tmn.hci.xxx.hana.ondemand.com
       login: DEV_LOGIN_ENV_VAR
       password: DEV_PASSWORD_ENV_VAR
     - id: prod
       name: Production Tenant Trial
-      host: bcaf0b4atrial.it-cpitrial04.cfapps.eu10-002.hana.ondemand.com
+      host: lxxxxxx-tmn.hci.xxx.hana.ondemand.com
       login: PROD_LOGIN_ENV_VAR
       password: PROD_PASSWORD_ENV_VAR
   packages:
