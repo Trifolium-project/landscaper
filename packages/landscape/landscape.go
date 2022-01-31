@@ -75,13 +75,26 @@ type LandscapeYAML struct {
 	}
 }
 
+func(landscape *Landscape) GetSystem4Environment(environment *string) (*System, error) {
+	log.Println("TEst")
 
+	println()
+	
+	env := landscape.Environments[*environment]
+	if env == nil {
+		return nil, fmt.Errorf("Environment %s is not found", *environment)
+	}
+
+
+
+	return env.System, nil
+}
 
 func NewLandscape(configFile string) (*Landscape, error) {
-	
+	_ = godotenv.Load()
 	//cmd.Execute()
 	if configFile == "" {
-		configFile = "../conf/landscape.yaml"
+		configFile = "conf/landscape-prod.yaml"
 	}
 
 	
@@ -127,8 +140,21 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 		}
 
 		system.Client = cpiclient.NewCPIBasicAuthClient(login, password, systemYAML.Host)
-
+		
 		systems[system.Id] = system
+		
+		
+		//TODO: Implement check connection
+		/*
+		log.Println("Checking connection...")
+		
+		err = system.Client.CheckConnection()
+		if err != nil {
+			log.Fatalln(err)
+			//return nil, err
+		}
+		*/
+		
 	}
 
 	//Create packages
@@ -150,6 +176,7 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 			Suffix: environmentYAML.Suffix,
 			System: systems[environmentYAML.System],
 		}
+		fmt.Printf("'%s'\n", environment.Id)
 		
 		environments[environment.Id] = environment
 	}
@@ -167,13 +194,10 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 	return landscape, nil
 }
 
+//TODO: Change to viper
 func getEnvVariableValue(variableName string) (string, error) {
 	value := os.Getenv(variableName)
-
-	if value == "" {
-		_ = godotenv.Load()
-		value = os.Getenv(variableName)
-	}
+	log.Println(variableName)
 
 	if value == "" {
 		log.Fatalf("Necessary environment variables do not set neither in .env nor in environment")

@@ -17,13 +17,23 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
 
+	"github.com/Trifolium-project/landscaper/packages/landscape"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var cfgFile string
+var globalLandscape *landscape.Landscape
+
+//Persistent global flag
+var (
+	environment *string
+	pkg         *string
+)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -58,6 +68,9 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.landscaper.yaml)")
 
+	environment = rootCmd.PersistentFlags().String("env", "", "Environemnt")
+	pkg = rootCmd.PersistentFlags().String("pkg", "", "Package")
+
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
@@ -65,6 +78,23 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
+
+	_ = godotenv.Load()
+
+	globalLandscape, _ = landscape.NewLandscape("conf/landscape-prod.yaml")
+
+	if globalLandscape == nil {
+		log.Fatalln("Unable to read landscaper configuration")
+	}
+	//fmt.Println(globalLandscape)
+	//log.Println("Read integration packages")
+	//packages, _ := globalLandscape.Systems["dev"].Client.ReadIntegrationPackages()
+
+	//for _, pkg := range  packages {
+	//	fmt.Println(pkg.Id)
+	//}
+
+	log.Println(cfgFile)
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)

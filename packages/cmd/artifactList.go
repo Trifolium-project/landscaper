@@ -17,6 +17,9 @@ package cmd
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 )
@@ -32,7 +35,7 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("list called")
+		artifactList()
 	},
 }
 
@@ -48,4 +51,32 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+func artifactList() {
+		
+	if globalLandscape == nil {
+		println("Global landscape is not instantiated")
+		return
+	}
+
+	system, err := globalLandscape.GetSystem4Environment(environment)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	artifacts, err := system.Client.ReadIntegrationDesigntimeArtifacts(*pkg, false)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
+	fmt.Fprintln(writer, "#\tArtefactId\tVersion\tPackage")
+
+	for index, art := range artifacts {
+		fmt.Fprintf(writer, "%d\t%s\t%s\t%s\n", index, art.Id, art.Version, art.PackageId)
+		//fmt.Fprintf(writer, "%d\t%s\t%s\n", index, pkg.Id, pkg.Name)
+	}
+	writer.Flush()
+	
 }

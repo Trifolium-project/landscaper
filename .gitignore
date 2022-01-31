@@ -2,4 +2,4 @@ bin
 .DS_Store
 .env
 landscape-prod.yaml
-./landscaper
+landscaper

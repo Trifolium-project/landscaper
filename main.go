@@ -15,8 +15,11 @@ limitations under the License.
 */
 package main
 
-import "github.com/Trifolium-project/landscaper/packages/cmd"
+import (
+	"github.com/Trifolium-project/landscaper/packages/cmd"
+)
 
 func main() {
+	
 	cmd.Execute()
 }

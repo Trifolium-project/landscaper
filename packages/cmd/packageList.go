@@ -17,6 +17,9 @@ package cmd
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 )
@@ -32,7 +35,11 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("list called")
+
+		//env := packageListCmd.Flag("env")
+
+		//packageList(env.Value.String())
+		packageList()
 	},
 }
 
@@ -43,9 +50,40 @@ func init() {
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// listCmd.PersistentFlags().String("foo", "", "A help for foo")
+	//packageListCmd.PersistentFlags().String("env", "", "Environemnt")
+	
+	//packageListCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+func packageList() {
+
+		
+	if globalLandscape == nil {
+		println("Global landscape is not instantiated")
+		return
+	}
+
+	system, err := globalLandscape.GetSystem4Environment(environment)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	packages, err := system.Client.ReadIntegrationPackages()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
+	fmt.Fprintln(writer, "#\tPackageId")
+
+	for index, pkg := range packages {
+		fmt.Fprintf(writer, "%d\t%s\n", index, pkg.Id)
+		//fmt.Fprintf(writer, "%d\t%s\t%s\n", index, pkg.Id, pkg.Name)
+	}
+	writer.Flush()
+
 }
