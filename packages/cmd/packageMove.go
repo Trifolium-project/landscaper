@@ -48,7 +48,7 @@ func init() {
 
 	// Here you will define your flags and configuration settings.
 	targetEnv = packageMoveCmd.Flags().String("target-env", "", "Target environment")
-	toDeploy = packageMoveCmd.Flags().BoolP("deploy", "d", false , "Indicate whether necessary to deploy changed artifacts in target environment")
+	toDeploy = packageMoveCmd.Flags().BoolP("deploy", "d", false, "Indicate whether necessary to deploy changed artifacts in target environment")
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// moveCmd.PersistentFlags().String("foo", "", "A help for foo")
@@ -74,8 +74,6 @@ func packageMove() {
 
 	targetPackageId := *pkg + targetEnvironment.Suffix
 
-	
-
 	sourcePackage, err := originalEnvironment.System.Client.ReadIntegrationPackage(*pkg)
 	if err != nil {
 		log.Fatalln(err)
@@ -83,20 +81,33 @@ func packageMove() {
 
 	fetchArtifactConfig := true
 
-	artifacts, err := originalEnvironment.System.Client.ReadIntegrationDesigntimeArtifacts(*pkg, fetchArtifactConfig)
+	sourceArtifacts, err := originalEnvironment.System.Client.ReadIntegrationDesigntimeArtifacts(*pkg, fetchArtifactConfig)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	
+	//Check that there is no artifact in draft state in source package
+	draftIFlows := ""
+	for _, sourceArtifact := range sourceArtifacts {
 
+		if sourceArtifact.Version == "Active" {
+			draftIFlows += sourceArtifact.Id + "|"
+		}
+
+	}
+
+	if draftIFlows != "" {
+		log.Fatalf("These artifacts in package %s are in Draft state: %s. Please save them as version.", *pkg, draftIFlows)
+	}
+
+	//Transport package
 	tagretPackage, err := targetEnvironment.System.Client.ReadIntegrationPackage(targetPackageId)
 	if err != nil {
 		log.Println(err)
 	} else {
 		println(tagretPackage.Id)
 	}
-
+	currentTargetArtifactVersions := make(map[string]string)
 	if tagretPackage == nil {
 
 		tagretPackage := &cpiclient.IntegrationPackage{
@@ -105,7 +116,7 @@ func packageMove() {
 			Description: sourcePackage.Description,
 			ShortText:   sourcePackage.ShortText + "(environment - '" + targetEnvironment.Suffix + "')",
 
-			Keywords:    "",
+			Keywords: "",
 		}
 
 		err = targetEnvironment.System.Client.CreateIntegrationPackage(tagretPackage)
@@ -113,36 +124,81 @@ func packageMove() {
 			log.Fatalln(err)
 		}
 
+	} else {
+		targetArtifacts, err := targetEnvironment.System.Client.ReadIntegrationDesigntimeArtifacts(targetPackageId, fetchArtifactConfig)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		for _, targetArtifact := range targetArtifacts {
+			//Create map - artifact(base name) - version for future checks
+			currentTargetArtifactVersions[targetArtifact.Id] = targetArtifact.Version
+		}
 	}
 
 	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
-	fmt.Fprintln(writer, "#\tArtefactId\tVersion\tPackage")
+	fmt.Fprintf(writer, "#\tArtefactId\tVersion\tPackage\tTransferred to %s\tDeployed\n", *targetEnv)
 
-	for index, art := range artifacts {
+	//Transport artifacts
+	for index, sourceArtifact := range sourceArtifacts {
+		id := sourceArtifact.Id + targetEnvironment.Suffix
 
-		newArtifact, err := originalEnvironment.System.Client.DownloadIntegrationDesigntimeArtifact(art.Id, art.Version)
-		if err != nil {
-			log.Fatalln(err)
+		transportArtifact := false
+		artifactExistsInTarget := false
+		if version, ok := currentTargetArtifactVersions[id]; ok {
+			artifactExistsInTarget = true
+			if version != sourceArtifact.Version {
+				transportArtifact = true
+			}
+		} else {
+			transportArtifact = true
 		}
 
-		newArtifact.PackageId = targetPackageId
-		newArtifact.Id = art.Id + targetEnvironment.Suffix
-		newArtifact.Description = art.Description + " " + targetEnvironment.Suffix
-		
-		err = targetEnvironment.System.Client.UploadIntegrationDesigntimeArtifact(newArtifact)
-		if err != nil {
-			log.Fatalln(err)
-		}
+		if transportArtifact {
+			id := sourceArtifact.Id + targetEnvironment.Suffix
+			
+			if artifactExistsInTarget{
+				version := currentTargetArtifactVersions[id]
 
-		if *toDeploy {
-			err = targetEnvironment.System.Client.DeployIntegrationDesigntimeArtifact(newArtifact.Id, newArtifact.Version)
+				targetEnvironment.System.Client.DeleteIntegrationDesigntimeArtifact(id, version)
+				if err != nil {
+					log.Fatalln(err)
+				}
+			}
+
+			newArtifact, err := originalEnvironment.System.Client.DownloadIntegrationDesigntimeArtifact(sourceArtifact.Id, sourceArtifact.Version)
 			if err != nil {
 				log.Fatalln(err)
 			}
-		}
+			newArtifact.Name = sourceArtifact.Name + " " + targetEnvironment.Suffix
+			newArtifact.PackageId = targetPackageId
+			newArtifact.Id = id
+			newArtifact.Description = sourceArtifact.Description
+			newArtifact.Version = sourceArtifact.Version
 
-		fmt.Fprintf(writer, "%d\t%s\t%s\t%s\n", index, art.Id, art.Version, art.PackageId)
-		//fmt.Fprintf(writer, "%d\t%s\t%s\n", index, pkg.Id, pkg.Name)
+			err = targetEnvironment.System.Client.UploadIntegrationDesigntimeArtifact(newArtifact)
+			if err != nil {
+				log.Fatalln(err)
+			}
+
+			if *toDeploy {
+				err = targetEnvironment.System.Client.DeployIntegrationDesigntimeArtifact(newArtifact.Id, newArtifact.Version)
+				if err != nil {
+					log.Fatalln(err)
+				}
+
+			}
+
+			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%t\t%t\n", index, newArtifact.Id, newArtifact.Version, newArtifact.PackageId, true, *toDeploy)
+
+			//fmt.Fprintf(writer, "%d\t%s\t%s\n", index, pkg.Id, pkg.Name)
+		} else {
+			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%t\t%t\n", index, id, sourceArtifact.Version, targetPackageId, false, false)
+		}
 	}
 	writer.Flush()
 }
+
+//TODO: Download backup package and iflows before making change
+//TODO: If package alread exists - upload and deploy only these iflows, that have changed version(or is new)
+//TODO: Check if all source iflows have version(are not in draft state)
