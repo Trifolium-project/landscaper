@@ -515,6 +515,56 @@ func (s *CPIClient) ReadIntegrationPackages() ([]*IntegrationPackage, error) {
 	return integrationPackages, nil
 }
 
+//IntegrationPackage by ID
+func (s *CPIClient) ReadIntegrationPackage(PackageId string) (*IntegrationPackage, error) {
+
+	url := fmt.Sprintf("https://" + s.URL + "/api/v1/" + "IntegrationPackages('" + PackageId + "')?$format=json")
+
+	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodGet, url, nil)
+	//req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	bytes, _, err := s.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var data map[string]interface{}
+
+	err = json.Unmarshal(bytes, &data)
+	if err != nil {
+		return nil, err
+	}
+
+	root := data["d"].((map[string]interface{}))
+
+	integrationPackage := &IntegrationPackage{
+		Id:                root["Id"].(string),
+		Name:              root["Name"].(string),
+		Description:       root["Description"].(string),
+		ShortText:         root["ShortText"].(string),
+		Version:           root["Version"].(string),
+		Vendor:            root["Vendor"].(string),
+		PartnerContent:    root["PartnerContent"].(bool),
+		UpdateAvailable:   root["UpdateAvailable"].(bool),
+		Mode:              root["Mode"].(string),
+		SupportedPlatform: root["SupportedPlatform"].(string),
+		ModifiedBy:        root["ModifiedBy"].(string),
+		CreationDate:      root["CreationDate"].(string),
+		ModifiedDate:      root["ModifiedDate"].(string),
+		CreatedBy:         root["CreatedBy"].(string),
+		Products:          root["Products"].(string),
+		Keywords:          root["Keywords"].(string),
+		Countries:         root["Countries"].(string),
+		Industries:        root["Industries"].(string),
+		LineOfBusiness:    root["LineOfBusiness"].(string),
+		PackageContent:    "",
+	}
+
+	return integrationPackage, nil
+}
+
 /*
 func (s *CPIClient) createIntegrationPackage2(integrationPackage *IntegrationPackage2) (error) {
 	url := fmt.Sprintf(s.URL + "/IntegrationPackages")
