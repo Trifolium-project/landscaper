@@ -76,9 +76,6 @@ type LandscapeYAML struct {
 }
 
 func(landscape *Landscape) GetSystem4Environment(environment *string) (*System, error) {
-	log.Println("TEst")
-
-	println()
 	
 	env := landscape.Environments[*environment]
 	if env == nil {
@@ -88,6 +85,18 @@ func(landscape *Landscape) GetSystem4Environment(environment *string) (*System, 
 
 
 	return env.System, nil
+}
+
+//Get environment by ID
+func(landscape *Landscape) GetEnvironment(environment string) (*Environment, error) {
+	
+	env := landscape.Environments[environment]
+	if env == nil {
+		return nil, fmt.Errorf("Environment %s is not found", environment)
+	}
+
+
+	return env, nil
 }
 
 func NewLandscape(configFile string) (*Landscape, error) {
