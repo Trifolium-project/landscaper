@@ -128,7 +128,7 @@ func NewCPIBasicAuthClient(username, password, url string) *CPIClient {
 
 func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 	req.SetBasicAuth(s.Username, s.Password)
-	log.Println(req)
+	//log.Println(req)
 
 	resp, err := s.Client.Do(req)
 
@@ -176,7 +176,7 @@ func (s *CPIClient) getCSRFToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	log.Println(headers)
+	//log.Println(headers)
 	//log.Println(req.Cookie("__Host-csrf-client-id"))
 
 	return headers[http.CanonicalHeaderKey("X-CSRF-Token")][0], nil
@@ -646,13 +646,13 @@ func (s *CPIClient) CreateIntegrationPackage(integrationPackage *IntegrationPack
 func (s *CPIClient) CheckConnection() error {
 
 	token, err := s.getCSRFToken()
-	log.Println(token)
-	if err != nil {
+	
+	if err != nil || token == ""{
 		log.Printf("System %s check unsuccessful: %s", s.URL, err)
 
 		return err
 	}
-	log.Printf("System %s check successful", s.URL)
+	//log.Printf("System %s check successful", s.URL)
 
 	return nil
 }
