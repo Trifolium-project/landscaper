@@ -119,7 +119,9 @@ func packageMove() {
 			Id:          targetPackageId,
 			Name:        targetEnvironment.Suffix + " " + sourcePackage.Name,
 			Description: sourcePackage.Description,
-			ShortText:   sourcePackage.ShortText + "(environment - '" + targetEnvironment.Suffix + "')",
+			ShortText:   sourcePackage.ShortText + "(environment - '" + targetEnvironment.Id + "')",
+			Vendor: sourcePackage.Vendor,
+			Version: sourcePackage.Version,
 
 			Keywords: "",
 		}
@@ -193,7 +195,7 @@ func packageMove() {
 				conf := &cpiclient.Configuration{
 					ParameterKey: parameter.Key,
 					ParameterValue: parameter.Value,
-					DataType: "xsd:string",
+					DataType: parameter.Type,
 				}
 				err = targetEnvironment.System.Client.UpdateIntegrationDesigntimeArtifactConfiguration(newArtifact.Id, newArtifact.Version, conf)
 				if err != nil {
@@ -210,16 +212,14 @@ func packageMove() {
 
 			}
 
-			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%t\t%t\n", index, newArtifact.Id, newArtifact.Version, newArtifact.PackageId, true, *toDeploy)
+			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%t\t%t\n", index + 1, newArtifact.Id, newArtifact.Version, newArtifact.PackageId, true, *toDeploy)
 
 			//fmt.Fprintf(writer, "%d\t%s\t%s\n", index, pkg.Id, pkg.Name)
 		} else {
-			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%t\t%t\n", index, id, sourceArtifact.Version, targetPackageId, false, false)
+			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%t\t%t\n", index + 1, id, sourceArtifact.Version, targetPackageId, false, false)
 		}
 	}
 	writer.Flush()
 }
 
 //TODO: Download backup package and iflows before making change
-//TODO: If package alread exists - upload and deploy only these iflows, that have changed version(or is new)
-//TODO: Check if all source iflows have version(are not in draft state)

@@ -132,7 +132,7 @@ func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 		log.Printf("HTTP request error: %s", err)
 		return nil, nil, err
 	}
-	log.Printf("Status code of HTTP request: %d", resp.StatusCode)
+	//log.Printf("Status code of HTTP request: %d", resp.StatusCode)
 
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)

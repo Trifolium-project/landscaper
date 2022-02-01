@@ -81,11 +81,14 @@ func initConfig() {
 
 	_ = godotenv.Load()
 
-	globalLandscape, _ = landscape.NewLandscape("conf/landscape-prod.yaml")
-
-	if globalLandscape == nil {
+	landscape, err := landscape.NewLandscape("conf/landscape-prod.yaml")
+	if err != nil {
+		log.Println(err)	
+	} 
+	if landscape == nil {
 		log.Fatalln("Unable to read landscaper configuration")
 	}
+	globalLandscape = landscape
 	//fmt.Println(globalLandscape)
 	//log.Println("Read integration packages")
 	//packages, _ := globalLandscape.Systems["dev"].Client.ReadIntegrationPackages()

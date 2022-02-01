@@ -65,6 +65,7 @@ type Configuration struct {
 type Parameter struct {
 	Key string
 	Value string
+	Type string
 }
 
 
@@ -88,6 +89,7 @@ type LandscapeYAML struct {
 					Parameters []struct{
 						Key string
 						Value string
+						Type string
 					}
 				}
 			}
@@ -150,15 +152,13 @@ func NewLandscape(configFile string) (*Landscape, error) {
 	if configFile == "" {
 		configFile = "conf/landscape-prod.yaml"
 	}
-
-	
     
 	config, err := os.ReadFile(configFile)
 	
 	if err != nil {
 		return nil, err
     }
-	log.Println(string(config))
+	//log.Println(string(config))
 
 	landscape := LandscapeYAML{}
     err = yaml.Unmarshal(config, &landscape)
@@ -166,8 +166,8 @@ func NewLandscape(configFile string) (*Landscape, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(string(landscape.Landscape.Packages[0].Artifacts[0].Configurations[0].Parameters[0].Key))
-	fmt.Println(string(landscape.Landscape.Packages[0].Artifacts[0].Configurations[0].Parameters[0].Value))
+	//fmt.Println(string(landscape.Landscape.Packages[0].Artifacts[0].Configurations[0].Parameters[0].Key))
+	//fmt.Println(string(landscape.Landscape.Packages[0].Artifacts[0].Configurations[0].Parameters[0].Value))
 
 	return buildLandscapeFromManifest(&landscape)
 }
@@ -221,9 +221,14 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 
 				parameters := []*Parameter{}
 				for _, parameterYAML := range configurationYAML.Parameters {
+					paramType := parameterYAML.Type
+					if paramType == "" {
+						paramType = "xsd:string"
+					}
 					parameter := &Parameter{
 						Key: parameterYAML.Key,
 						Value: parameterYAML.Value,
+						Type: paramType,
 					}
 					parameters = append(parameters, parameter)
 					
@@ -266,7 +271,7 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 			Suffix: environmentYAML.Suffix,
 			System: systems[environmentYAML.System],
 		}
-		fmt.Printf("'%s'\n", environment.Id)
+		//fmt.Printf("'%s'\n", environment.Id)
 		
 		environments[environment.Id] = environment
 	}
