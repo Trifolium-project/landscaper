@@ -200,6 +200,7 @@ func (s *CPIClient) UpdateIntegrationDesigntimeArtifactConfiguration(ArtifactId 
 		return err
 	}
 	req.Header.Add("X-CSRF-Token", token)
+	req.Header.Add("Content-Type", "application/json")
 
 	_, _, err = s.doRequest(req)
 	if err != nil {
