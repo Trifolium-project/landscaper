@@ -64,8 +64,13 @@ func packageMove() {
 		println("Global landscape is not instantiated")
 		return
 	}
+	
 
 	originalEnvironment := globalLandscape.OriginalEnvironment
+
+	if *targetEnv == originalEnvironment.Id {
+		log.Fatalln("Cannot import changes to original environment, stopping execution")
+	}
 
 	targetEnvironment, err := globalLandscape.GetEnvironment(*targetEnv)
 	if err != nil {
@@ -155,6 +160,9 @@ func packageMove() {
 		}
 
 		if transportArtifact {
+
+			parameters, err := globalLandscape.GetArtifactConfiguration(*targetEnv, sourceArtifact.PackageId, sourceArtifact.Id)
+
 			id := sourceArtifact.Id + targetEnvironment.Suffix
 			
 			if artifactExistsInTarget{
@@ -180,6 +188,19 @@ func packageMove() {
 			if err != nil {
 				log.Fatalln(err)
 			}
+
+			for _, parameter := range parameters {
+				conf := &cpiclient.Configuration{
+					ParameterKey: parameter.Key,
+					ParameterValue: parameter.Value,
+					DataType: "xsd:string",
+				}
+				err = targetEnvironment.System.Client.UpdateIntegrationDesigntimeArtifactConfiguration(newArtifact.Id, newArtifact.Version, conf)
+				if err != nil {
+					log.Fatalln(err)
+				}
+			}
+
 
 			if *toDeploy {
 				err = targetEnvironment.System.Client.DeployIntegrationDesigntimeArtifact(newArtifact.Id, newArtifact.Version)

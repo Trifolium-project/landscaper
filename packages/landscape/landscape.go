@@ -49,7 +49,24 @@ type Environment struct {
 
 type Package struct {
 	Id string
+	Artifacts map[string]*Artifact
 }
+
+type Artifact struct {
+	Id string
+	Configurations map[string]*Configuration
+}
+
+type Configuration struct {
+	Environment string
+	Parameters []*Parameter
+}
+
+type Parameter struct {
+	Key string
+	Value string
+}
+
 
 
 type LandscapeYAML struct {
@@ -64,6 +81,16 @@ type LandscapeYAML struct {
 		}
 		Packages []struct{
 			Id string
+			Artifacts []struct{
+				Id string
+				Configurations []struct{
+					Environment string
+					Parameters []struct{
+						Key string
+						Value string
+					}
+				}
+			}
 		}
 		Environments []struct{
 			Id string
@@ -74,6 +101,24 @@ type LandscapeYAML struct {
 		OriginalEnvironment string `yaml:"originalEnvironment"`
 	}
 }
+
+
+
+func(landscape *Landscape) GetArtifactConfiguration(environment string, pkg string, artifact string) ([]*Parameter, error) {
+
+	defer func() {
+        if err := recover(); err != nil {
+            log.Println("panic occurred:", err)
+        }
+    }()
+
+
+	config := landscape.Packages[pkg].Artifacts[artifact].Configurations[environment].Parameters
+
+	return config, nil
+}
+
+
 
 func(landscape *Landscape) GetSystem4Environment(environment *string) (*System, error) {
 	
@@ -121,7 +166,8 @@ func NewLandscape(configFile string) (*Landscape, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(string(landscape.Landscape.OriginalEnvironment))
+	fmt.Println(string(landscape.Landscape.Packages[0].Artifacts[0].Configurations[0].Parameters[0].Key))
+	fmt.Println(string(landscape.Landscape.Packages[0].Artifacts[0].Configurations[0].Parameters[0].Value))
 
 	return buildLandscapeFromManifest(&landscape)
 }
@@ -168,9 +214,44 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 
 	//Create packages
 	for _, packageYAML := range landscapeYaml.Landscape.Packages {
+		artifacts := make(map[string]*Artifact)
+		for _, artifactYAML := range packageYAML.Artifacts {
+			configurations := make(map[string]*Configuration)
+			for _, configurationYAML := range artifactYAML.Configurations {
+
+				parameters := []*Parameter{}
+				for _, parameterYAML := range configurationYAML.Parameters {
+					parameter := &Parameter{
+						Key: parameterYAML.Key,
+						Value: parameterYAML.Value,
+					}
+					parameters = append(parameters, parameter)
+					
+				}
+
+				configuration := &Configuration{
+					Environment: configurationYAML.Environment,
+					Parameters: parameters,
+				}
+				configurations[configuration.Environment] = configuration
+			}
+
+			artifact := &Artifact{
+				Id: artifactYAML.Id,
+				Configurations: configurations,
+			}
+
+			artifacts[artifactYAML.Id] = artifact
+
+		}
+
+
+
+
 		
 		package_ := &Package{
 			Id: packageYAML.Id,
+			Artifacts: artifacts,
 		}
 
 		packages[package_.Id] = package_
