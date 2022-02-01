@@ -30,6 +30,10 @@ import (
 	"net/http/httptrace"
 )
 
+const (
+	apiVersion = "v1"
+)
+
 type CPIClient struct {
 	Username    string
 	Password    string
@@ -160,7 +164,7 @@ func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 }
 
 func (s *CPIClient) getCSRFToken() (string, error) {
-	url := fmt.Sprintf("https://" + s.URL + "/api/v1/" + "?$format=json")
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "?$format=json")
 	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodGet, url, nil)
 	//req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -181,7 +185,7 @@ func (s *CPIClient) getCSRFToken() (string, error) {
 
 //Configuration
 func (s *CPIClient) UpdateIntegrationDesigntimeArtifactConfiguration(ArtifactId string, ArtifactVersion string, configuration *Configuration) error {
-	url := fmt.Sprintf("https://" + s.URL + "/api/v1/" + "IntegrationDesigntimeArtifacts(Id='" +
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationDesigntimeArtifacts(Id='" +
 		ArtifactId + "',Version='" + ArtifactVersion + "')/$links/Configurations('" + configuration.ParameterKey + "')")
 
 	body, err := json.Marshal(configuration)
@@ -211,7 +215,7 @@ func (s *CPIClient) UpdateIntegrationDesigntimeArtifactConfiguration(ArtifactId 
 }
 
 func (s *CPIClient) ReadIntegrationDesigntimeArtifactConfigurations(ArtifactId string, ArtifactVersion string) ([]*Configuration, error) {
-	url := fmt.Sprintf("https://" + s.URL + "/api/v1/" + "IntegrationDesigntimeArtifacts(Id='" +
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationDesigntimeArtifacts(Id='" +
 		ArtifactId + "',Version='" + ArtifactVersion + "')/Configurations" + "?$format=json")
 
 	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodGet, url, nil)
@@ -252,7 +256,7 @@ func (s *CPIClient) ReadIntegrationDesigntimeArtifactConfigurations(ArtifactId s
 
 //IntegrationDesigntimeArtifacts
 func (s *CPIClient) ReadIntegrationDesigntimeArtifacts(PackageId string, fetchConfig bool) ([]*IntegrationDesigntimeArtifact, error) {
-	url := fmt.Sprintf("https://" + s.URL + "/api/v1/" + "IntegrationPackages('" + PackageId +
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationPackages('" + PackageId +
 		"')/IntegrationDesigntimeArtifacts" + "?$format=json")
 
 	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodGet, url, nil)
@@ -308,7 +312,7 @@ func (s *CPIClient) DownloadIntegrationDesigntimeArtifact(ArtifactId string, Art
 	if err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("https://" + s.URL + "/api/v1/" + "IntegrationDesigntimeArtifacts(Id='" +
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationDesigntimeArtifacts(Id='" +
 		ArtifactId + "',Version='" + ArtifactVersion + "')/$value")
 
 	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodGet, url, nil)
@@ -330,7 +334,7 @@ func (s *CPIClient) DownloadIntegrationDesigntimeArtifact(ArtifactId string, Art
 
 func (s *CPIClient) ReadIntegrationDesigntimeArtifact(ArtifactId string, ArtifactVersion string) (*IntegrationDesigntimeArtifact, error) {
 
-	url := fmt.Sprintf("https://" + s.URL + "/api/v1/" + "IntegrationDesigntimeArtifacts(Id='" +
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationDesigntimeArtifacts(Id='" +
 		ArtifactId + "',Version='" + ArtifactVersion + "')")
 
 	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodGet, url, nil)
@@ -374,7 +378,7 @@ func (s *CPIClient) ReadIntegrationDesigntimeArtifact(ArtifactId string, Artifac
 
 func (s *CPIClient) UploadIntegrationDesigntimeArtifact(integrationArtifact *IntegrationDesigntimeArtifact) error {
 
-	url := fmt.Sprintf("https://" + s.URL + "/api/v1/" + "IntegrationDesigntimeArtifacts")
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationDesigntimeArtifacts")
 
 	body, err := json.Marshal(integrationArtifact)
 
@@ -405,7 +409,7 @@ func (s *CPIClient) UploadIntegrationDesigntimeArtifact(integrationArtifact *Int
 
 func (s *CPIClient) DeployIntegrationDesigntimeArtifact(ArtifactId string, ArtifactVersion string) error {
 
-	url := fmt.Sprintf("https://" + s.URL + "/api/v1/" + "DeployIntegrationDesigntimeArtifact?Id='" +
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "DeployIntegrationDesigntimeArtifact?Id='" +
 		ArtifactId + "'&Version='" + ArtifactVersion + "'")
 
 	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodPost, url, nil)
@@ -431,9 +435,9 @@ func (s *CPIClient) DeployIntegrationDesigntimeArtifact(ArtifactId string, Artif
 }
 
 //Delete artifact
-func (s *CPIClient) DeleteIntegrationDesigntimeArtifact(ArtifactId string, ArtifactVersion string) ( error ) {
+func (s *CPIClient) DeleteIntegrationDesigntimeArtifact(ArtifactId string, ArtifactVersion string) error {
 
-	url := fmt.Sprintf("https://" + s.URL + "/api/v1/" + "IntegrationDesigntimeArtifacts(Id='" +
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationDesigntimeArtifacts(Id='" +
 		ArtifactId + "',Version='" + ArtifactVersion + "')")
 
 	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodDelete, url, nil)
@@ -456,9 +460,7 @@ func (s *CPIClient) DeleteIntegrationDesigntimeArtifact(ArtifactId string, Artif
 
 	return nil
 
-
 }
-
 
 /*
 func (s *CPIClient) undeployIntegrationDesigntimeArtifact(ArtifactId string, ArtifactVersion string ) (error) {
@@ -492,7 +494,7 @@ func (s *CPIClient) undeployIntegrationDesigntimeArtifact(ArtifactId string, Art
 //IntegrationPackages
 func (s *CPIClient) ReadIntegrationPackages() ([]*IntegrationPackage, error) {
 
-	url := fmt.Sprintf("https://" + s.URL + "/api/v1/" + "IntegrationPackages" + "?$format=json")
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationPackages" + "?$format=json")
 
 	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodGet, url, nil)
 	//req, err := http.NewRequest("GET", url, nil)
@@ -549,7 +551,7 @@ func (s *CPIClient) ReadIntegrationPackages() ([]*IntegrationPackage, error) {
 //IntegrationPackage by ID
 func (s *CPIClient) ReadIntegrationPackage(PackageId string) (*IntegrationPackage, error) {
 
-	url := fmt.Sprintf("https://" + s.URL + "/api/v1/" + "IntegrationPackages('" + PackageId + "')?$format=json")
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationPackages('" + PackageId + "')?$format=json")
 
 	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodGet, url, nil)
 	//req, err := http.NewRequest("GET", url, nil)
@@ -610,7 +612,7 @@ func (s *CPIClient) createIntegrationPackage2(integrationPackage *IntegrationPac
 */
 
 func (s *CPIClient) CreateIntegrationPackage(integrationPackage *IntegrationPackage) error {
-	url := fmt.Sprintf("https://" + s.URL + "/api/v1/" + "IntegrationPackages")
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationPackages")
 
 	body, err := json.Marshal(integrationPackage)
 	if err != nil {
