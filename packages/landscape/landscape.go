@@ -16,12 +16,16 @@ limitations under the License.
 package landscape
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
+	"strings"
+	"syscall"
 
 	"github.com/Trifolium-project/landscaper/packages/cpiclient"
 	"github.com/joho/godotenv"
+	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
 
@@ -185,16 +189,37 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 		system := &System{}
 		system.Id = systemYAML.Id
 		system.Name = systemYAML.Name
+
 		login, err := getEnvVariableValue(systemYAML.Login)
 		if err != nil {
 			return nil, err
 		}
+		
 		password, err := getEnvVariableValue(systemYAML.Password)
 		if err != nil {
 			return nil, err
 		}
 
-		system.Client = cpiclient.NewCPIBasicAuthClient(login, password, systemYAML.Host)
+
+		reader := bufio.NewReader(os.Stdin)
+
+		if login == ""{
+			fmt.Printf("Please enter login for system %s:\n", system.Name)
+			login, _ = reader.ReadString('\n')
+		}
+		if password == ""{
+			fmt.Printf("Please enter password for system %s:\n", system.Name)
+			//password, _ = reader.ReadString('\n')
+			bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+			if err != nil {
+				return  nil , err
+			}
+
+			password = string(bytePassword)
+		}
+
+
+		system.Client = cpiclient.NewCPIBasicAuthClient(strings.TrimSpace(login), strings.TrimSpace(password), systemYAML.Host)
 		
 		systems[system.Id] = system
 		
@@ -292,11 +317,12 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 //TODO: Change to viper
 func getEnvVariableValue(variableName string) (string, error) {
 	value := os.Getenv(variableName)
-	log.Println(variableName)
-
+	
+	/*
 	if value == "" {
 		log.Fatalf("Necessary environment variables do not set neither in .env nor in environment")
 	}
+	*/
 	
 	return value, nil
 }
