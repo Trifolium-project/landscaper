@@ -17,9 +17,16 @@ package cmd
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"text/tabwriter"
 
+	"github.com/Trifolium-project/landscaper/packages/cpiclient"
 	"github.com/spf13/cobra"
 )
+
+var targetEnv *string
+var toDeploy *bool
 
 // moveCmd represents the move command
 var packageMoveCmd = &cobra.Command{
@@ -32,15 +39,50 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("package move called")
+		/*
+		finished := make(chan bool)
+		finished <- false
+
+		bar := progressbar.DefaultBytes(
+			-1,
+			fmt.Sprintf("Transporting %s to %s...",*pkg, *targetEnv),
+		)
+		
+		go packageMove(finished)
+
+		for ! <- finished {
+			bar.Add(1)
+			time.Sleep(50 * time.Millisecond)
+		}
+
+		*/
+
+		//showProgress()
+		fmt.Printf("Transporting %s to %s...\n",*pkg, *targetEnv)
+		packageMove()
+		
+		
 	},
 }
-
+/*
+func showProgress(){
+	bar := progressbar.DefaultBytes(
+		-1,
+		fmt.Sprintf("Transporting %s to %s...",*pkg, *targetEnv),
+	)
+	
+	for i := 0; i < 1000; i++ {
+		bar.Add(1)
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+*/
 func init() {
 	packageCmd.AddCommand(packageMoveCmd)
 
 	// Here you will define your flags and configuration settings.
-
+	targetEnv = packageMoveCmd.Flags().String("target-env", "", "Target environment")
+	toDeploy = packageMoveCmd.Flags().BoolP("deploy", "d", false, "Indicate whether necessary to deploy changed artifacts in target environment")
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// moveCmd.PersistentFlags().String("foo", "", "A help for foo")
@@ -49,3 +91,175 @@ func init() {
 	// is called directly, e.g.:
 	// moveCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
+
+func finish(finished chan bool) {
+	finished <- true
+}
+
+func packageMove() {
+
+	//defer finish(finished)
+
+	if globalLandscape == nil {
+		println("Global landscape is not instantiated")
+		return
+	}
+	
+
+	originalEnvironment := globalLandscape.OriginalEnvironment
+
+	if *targetEnv == originalEnvironment.Id {
+		log.Fatalln("Cannot import changes to original environment, stopping execution")
+	}
+
+	targetEnvironment, err := globalLandscape.GetEnvironment(*targetEnv)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	targetPackageId := *pkg + targetEnvironment.Suffix
+
+	sourcePackage, err := originalEnvironment.System.Client.ReadIntegrationPackage(*pkg)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	fetchArtifactConfig := true
+
+	sourceArtifacts, err := originalEnvironment.System.Client.ReadIntegrationDesigntimeArtifacts(*pkg, fetchArtifactConfig)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	//Check that there is no artifact in draft state in source package
+	draftIFlows := ""
+	for _, sourceArtifact := range sourceArtifacts {
+
+		if sourceArtifact.Version == "Active" {
+			draftIFlows += sourceArtifact.Id + "|"
+		}
+
+	}
+
+	if draftIFlows != "" {
+		log.Fatalf("These artifacts in package %s are in Draft state: %s. Please save them as version.", *pkg, draftIFlows)
+	}
+
+	//Transport package
+	tagretPackage, err := targetEnvironment.System.Client.ReadIntegrationPackage(targetPackageId)
+	if err != nil {
+		log.Println(err)
+	} else {
+		//println(tagretPackage.Id)
+	}
+	currentTargetArtifactVersions := make(map[string]string)
+	if tagretPackage == nil {
+
+		tagretPackage := &cpiclient.IntegrationPackage{
+			Id:          targetPackageId,
+			Name:        targetEnvironment.Suffix + " " + sourcePackage.Name,
+			Description: sourcePackage.Description,
+			ShortText:   sourcePackage.ShortText + "(environment - '" + targetEnvironment.Id + "')",
+			Vendor: sourcePackage.Vendor,
+			Version: sourcePackage.Version,
+
+			Keywords: "",
+		}
+
+		err = targetEnvironment.System.Client.CreateIntegrationPackage(tagretPackage)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+	} else {
+		targetArtifacts, err := targetEnvironment.System.Client.ReadIntegrationDesigntimeArtifacts(targetPackageId, fetchArtifactConfig)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		for _, targetArtifact := range targetArtifacts {
+			//Create map - artifact(base name) - version for future checks
+			currentTargetArtifactVersions[targetArtifact.Id] = targetArtifact.Version
+		}
+	}
+
+	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
+	fmt.Fprintf(writer, "#\tArtefactId\tVersion\tPackage\tTransferred to %s\tDeployed\n", *targetEnv)
+
+	//Transport artifacts
+	for index, sourceArtifact := range sourceArtifacts {
+		id := sourceArtifact.Id + targetEnvironment.Suffix
+
+		transportArtifact := false
+		artifactExistsInTarget := false
+		if version, ok := currentTargetArtifactVersions[id]; ok {
+			artifactExistsInTarget = true
+			if version != sourceArtifact.Version {
+				transportArtifact = true
+			}
+		} else {
+			transportArtifact = true
+		}
+
+		if transportArtifact {
+
+			parameters, err := globalLandscape.GetArtifactConfiguration(*targetEnv, sourceArtifact.PackageId, sourceArtifact.Id)
+
+			id := sourceArtifact.Id + targetEnvironment.Suffix
+			
+			if artifactExistsInTarget{
+				version := currentTargetArtifactVersions[id]
+
+				targetEnvironment.System.Client.DeleteIntegrationDesigntimeArtifact(id, version)
+				if err != nil {
+					log.Fatalln(err)
+				}
+			}
+
+			newArtifact, err := originalEnvironment.System.Client.DownloadIntegrationDesigntimeArtifact(sourceArtifact.Id, sourceArtifact.Version)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			newArtifact.Name = sourceArtifact.Name + " " + targetEnvironment.Suffix
+			newArtifact.PackageId = targetPackageId
+			newArtifact.Id = id
+			newArtifact.Description = sourceArtifact.Description
+			newArtifact.Version = sourceArtifact.Version
+
+			err = targetEnvironment.System.Client.UploadIntegrationDesigntimeArtifact(newArtifact)
+			if err != nil {
+				log.Fatalln(err)
+			}
+
+			for _, parameter := range parameters {
+				conf := &cpiclient.Configuration{
+					ParameterKey: parameter.Key,
+					ParameterValue: parameter.Value,
+					DataType: parameter.Type,
+				}
+				err = targetEnvironment.System.Client.UpdateIntegrationDesigntimeArtifactConfiguration(newArtifact.Id, newArtifact.Version, conf)
+				if err != nil {
+					log.Fatalln(err)
+				}
+			}
+
+
+			if *toDeploy {
+				err = targetEnvironment.System.Client.DeployIntegrationDesigntimeArtifact(newArtifact.Id, newArtifact.Version)
+				if err != nil {
+					log.Fatalln(err)
+				}
+
+			}
+
+			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%t\t%t\n", index + 1, newArtifact.Id, newArtifact.Version, newArtifact.PackageId, true, *toDeploy)
+
+			//fmt.Fprintf(writer, "%d\t%s\t%s\n", index, pkg.Id, pkg.Name)
+		} else {
+			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%t\t%t\n", index + 1, id, sourceArtifact.Version, targetPackageId, false, false)
+		}
+	}
+	writer.Flush()
+}
+
+//TODO: Download backup package and iflows before making change

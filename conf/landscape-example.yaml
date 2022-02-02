@@ -13,7 +13,18 @@ landscape:
       login: PROD_LOGIN_ENV_VAR
       password: PROD_PASSWORD_ENV_VAR
   packages:
-    - id: CheckIntegration
+    - id: SAPHybrisCloudforCustomerIntegrationwithSAPCRM
+      artifacts:
+        - id: com.sap.scenarios.crm2cod.simpleconnectivity
+          configurations:
+            - environment: QA
+              parameters:
+                - key: p-key-alias
+                  value: c4c_qa_alias
+                - key: Host
+                  value: my123456.crm.ondemand.com
+                - key: CRM_address_2
+                  value: /QA/CRM/COD/SimpleConnect
     - id: CRMIntegrationPackage
     - id: MarketingIntegrationPackage
   environments:
@@ -27,9 +38,9 @@ landscape:
       system: dev
     - id: Prod
       name: Prod Environment
-      suffix: PRD
+      suffix: null
       system: prod
-  originalEnvironment: dev
+  originalEnvironment: Dev
     
 
 
