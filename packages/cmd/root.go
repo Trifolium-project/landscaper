@@ -97,7 +97,7 @@ func initConfig() {
 	//	fmt.Println(pkg.Id)
 	//}
 
-	log.Println(cfgFile)
+	//log.Println(cfgFile)
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)

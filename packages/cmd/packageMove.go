@@ -39,10 +39,44 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		/*
+		finished := make(chan bool)
+		finished <- false
+
+		bar := progressbar.DefaultBytes(
+			-1,
+			fmt.Sprintf("Transporting %s to %s...",*pkg, *targetEnv),
+		)
+		
+		go packageMove(finished)
+
+		for ! <- finished {
+			bar.Add(1)
+			time.Sleep(50 * time.Millisecond)
+		}
+
+		*/
+
+		//showProgress()
+		fmt.Printf("Transporting %s to %s...\n",*pkg, *targetEnv)
 		packageMove()
+		
+		
 	},
 }
-
+/*
+func showProgress(){
+	bar := progressbar.DefaultBytes(
+		-1,
+		fmt.Sprintf("Transporting %s to %s...",*pkg, *targetEnv),
+	)
+	
+	for i := 0; i < 1000; i++ {
+		bar.Add(1)
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+*/
 func init() {
 	packageCmd.AddCommand(packageMoveCmd)
 
@@ -58,7 +92,13 @@ func init() {
 	// moveCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
+func finish(finished chan bool) {
+	finished <- true
+}
+
 func packageMove() {
+
+	//defer finish(finished)
 
 	if globalLandscape == nil {
 		println("Global landscape is not instantiated")
@@ -110,7 +150,7 @@ func packageMove() {
 	if err != nil {
 		log.Println(err)
 	} else {
-		println(tagretPackage.Id)
+		//println(tagretPackage.Id)
 	}
 	currentTargetArtifactVersions := make(map[string]string)
 	if tagretPackage == nil {
