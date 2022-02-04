@@ -22,10 +22,12 @@ import (
 	"text/tabwriter"
 
 	"github.com/Trifolium-project/landscaper/packages/cpiclient"
+	"github.com/Trifolium-project/landscaper/packages/util"
 	"github.com/spf13/cobra"
 )
 
 var targetEnv *string
+var iflowList *[]string
 var toDeploy *bool
 
 // moveCmd represents the move command
@@ -83,6 +85,7 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	targetEnv = packageMoveCmd.Flags().String("target-env", "", "Target environment")
 	toDeploy = packageMoveCmd.Flags().BoolP("deploy", "d", false, "Indicate whether necessary to deploy changed artifacts in target environment")
+	iflowList = packageMoveCmd.Flags().StringSliceP("iflow", "f", []string{}, "List of integration flows to")
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// moveCmd.PersistentFlags().String("foo", "", "A help for foo")
@@ -128,6 +131,18 @@ func packageMove() {
 	sourceArtifacts, err := originalEnvironment.System.Client.ReadIntegrationDesigntimeArtifacts(*pkg, fetchArtifactConfig)
 	if err != nil {
 		log.Fatalln(err)
+	}
+
+	//Filter out unnecessary artifacts, if iflowList is not empty
+	if len(*iflowList) > 0 {
+		var filteredSourceArtifacts []*cpiclient.IntegrationDesigntimeArtifact
+
+		for _, sourceArtifacts := range sourceArtifacts {
+			if util.Contains(*iflowList, sourceArtifacts.Id) {
+				filteredSourceArtifacts = append(filteredSourceArtifacts, sourceArtifacts)
+			}
+		}
+		sourceArtifacts = filteredSourceArtifacts
 	}
 
 	//Check that there is no artifact in draft state in source package
