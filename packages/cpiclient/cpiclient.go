@@ -41,6 +41,7 @@ type CPIClient struct {
 	Client      *http.Client
 	clientTrace *httptrace.ClientTrace
 	traceCtx    context.Context
+	VerboseLog	bool
 }
 
 type IntegrationPackage struct {
@@ -101,7 +102,7 @@ type Configuration struct {
 	DataType       string
 }
 
-func NewCPIBasicAuthClient(username, password, url string) *CPIClient {
+func NewCPIBasicAuthClient(username, password, url string, verbose bool) *CPIClient {
 	clientTrace := &httptrace.ClientTrace{
 		//GotConn: func(info httptrace.GotConnInfo) { log.Printf("Connection was reused: %t", info.Reused) },
 		//ConnectStart: func(network, addr string) { log.Printf("Connection was started: %s, %s", network, addr) },
@@ -123,13 +124,16 @@ func NewCPIBasicAuthClient(username, password, url string) *CPIClient {
 		},
 		clientTrace: clientTrace,
 		traceCtx:    traceCtx,
+		VerboseLog: verbose,
 	}
 }
 
 func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 	req.SetBasicAuth(s.Username, s.Password)
-	//log.Println(req)
-
+	if s.VerboseLog {
+		log.Println(req)
+		log.Printf("\n\n")
+	}
 	resp, err := s.Client.Do(req)
 
 	if err != nil {
@@ -149,8 +153,10 @@ func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 		log.Fatal(err)
 	}
 	resp.Body.Close()
-
-	//log.Printf("Response: %s", resp)
+	if s.VerboseLog {
+		log.Printf("Response: %s", resp)
+		log.Printf("\n\n")
+	}
 
 	var httpCodeGroup int
 	for httpCodeGroup = resp.StatusCode; httpCodeGroup >= 10; httpCodeGroup = httpCodeGroup / 10 {
