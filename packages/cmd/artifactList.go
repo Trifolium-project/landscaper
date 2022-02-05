@@ -54,7 +54,7 @@ func init() {
 }
 
 func artifactList() {
-
+		
 	if globalLandscape == nil {
 		println("Global landscape is not instantiated")
 		return
@@ -71,24 +71,12 @@ func artifactList() {
 	}
 
 	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
-	fmt.Fprintln(writer, "#\tArtefactId\tVersion\tPackage\tDeploy Status\tDeployed Version")
+	fmt.Fprintln(writer, "#\tArtefactId\tVersion\tPackage")
 
 	for index, art := range artifacts {
-		status := "unknown"
-		deployedVersion := "-"
-		designtimeArtifact, err := system.Client.ReadIntegrationRuntimeArtifact(art.Id)
-		if err != nil {
-			//fmt.Println(err)
-			status = "Not deployed"
-			
-		} else {
-			status = designtimeArtifact.Status
-			deployedVersion = designtimeArtifact.Version
-		}
-		fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%s\t%s\n", index, art.Id, art.Version, art.PackageId, status,deployedVersion)
+		fmt.Fprintf(writer, "%d\t%s\t%s\t%s\n", index, art.Id, art.Version, art.PackageId)
 		//fmt.Fprintf(writer, "%d\t%s\t%s\n", index, pkg.Id, pkg.Name)
 	}
 	writer.Flush()
-	//
-
+//
 }
