@@ -34,6 +34,9 @@ const (
 	apiVersion = "v1"
 )
 
+
+
+
 type CPIClient struct {
 	Username    string
 	Password    string
@@ -41,6 +44,7 @@ type CPIClient struct {
 	Client      *http.Client
 	clientTrace *httptrace.ClientTrace
 	traceCtx    context.Context
+	VerboseLog	bool
 }
 
 type IntegrationPackage struct {
@@ -78,6 +82,37 @@ type IntegrationDesigntimeArtifact struct {
 	Configurations  []*Configuration `json:"-"`
 }
 
+type IntegrationRuntimeArtifact struct {
+	Id              string
+	Version         string
+	Name            string
+	Type 			string
+	DeployedBy		string
+	DeployedOn		string
+	Status			string
+}
+/*
+
+{
+	"d": {
+	  "Id": "IntegrationFlow_MessageStore_COMPLETED_PROCESSING",
+	  "Version": "1.0.0",
+	  "Name": "Integration Flow with MessageStore - COMPLETED PROCESSING",
+	  "Type": "INTEGRATION_FLOW",
+	  "DeployedBy": "Tester",
+	  "DeployedOn": "/Date(1521463557739)/",
+	  "Status": "STARTED",
+	  "ErrorInformation": {
+		"__deferred": {
+		  "uri": "https://sandbox.api.sap.com/cpi/api/v1/IntegrationRuntimeArtifacts('IntegrationFlow_MessageStore_COMPLETED_PROCESSING')/ErrorInformation"
+		}
+	  }
+	}
+  }
+  */
+
+
+
 //Workaround, while JSON response for certain requests is not supported
 type IntegrationDesigntimeArtifactXMLEntry struct {
 	XMLName    xml.Name                                   `xml:"entry"`
@@ -101,7 +136,7 @@ type Configuration struct {
 	DataType       string
 }
 
-func NewCPIBasicAuthClient(username, password, url string) *CPIClient {
+func NewCPIBasicAuthClient(username, password, url string, verbose bool) *CPIClient {
 	clientTrace := &httptrace.ClientTrace{
 		//GotConn: func(info httptrace.GotConnInfo) { log.Printf("Connection was reused: %t", info.Reused) },
 		//ConnectStart: func(network, addr string) { log.Printf("Connection was started: %s, %s", network, addr) },
@@ -123,13 +158,16 @@ func NewCPIBasicAuthClient(username, password, url string) *CPIClient {
 		},
 		clientTrace: clientTrace,
 		traceCtx:    traceCtx,
+		VerboseLog: verbose,
 	}
 }
 
 func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 	req.SetBasicAuth(s.Username, s.Password)
-	//log.Println(req)
-
+	if s.VerboseLog {
+		log.Println(req)
+		log.Printf("\n\n")
+	}
 	resp, err := s.Client.Do(req)
 
 	if err != nil {
@@ -149,8 +187,10 @@ func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 		log.Fatal(err)
 	}
 	resp.Body.Close()
-
-	//log.Printf("Response: %s", resp)
+	if s.VerboseLog {
+		log.Printf("Response: %s", resp)
+		log.Printf("\n\n")
+	}
 
 	var httpCodeGroup int
 	for httpCodeGroup = resp.StatusCode; httpCodeGroup >= 10; httpCodeGroup = httpCodeGroup / 10 {
@@ -253,6 +293,79 @@ func (s *CPIClient) ReadIntegrationDesigntimeArtifactConfigurations(ArtifactId s
 	return configurations, nil
 
 }
+
+
+//IntegrationRuntimeArtifacts
+func (s *CPIClient) ReadIntegrationRuntimeArtifact(ArtifactId string) (*IntegrationRuntimeArtifact, error) {
+
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationRuntimeArtifacts('" +
+		ArtifactId + "')" + "?$format=json")
+
+	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodGet, url, nil)
+	//req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	bytes, _, err := s.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var data map[string]interface{}
+
+	err = json.Unmarshal(bytes, &data)
+	if err != nil {
+		return nil, err
+	}
+
+	root := data["d"].((map[string]interface{}))
+
+	integrationArtifact := &IntegrationRuntimeArtifact{
+		Id:                root["Id"].(string),
+		Version:		   root["Version"].(string),
+		Name:              root["Name"].(string),
+		Type:			   root["Type"].(string),
+		DeployedBy:		   root["DeployedBy"].(string),
+		DeployedOn:		   root["DeployedOn"].(string),
+		Status:		       root["Status"].(string),
+
+	}
+	
+	return integrationArtifact, nil
+
+}
+
+/*
+type IntegrationRuntimeArtifact struct {
+	Id              string
+	Version         string
+	Name            string
+	Type 			string
+	DeployedBy		string
+	DeployedOn		string
+	Status			string
+}
+	
+
+
+{
+	"d": {
+	  "Id": "IntegrationFlow_MessageStore_COMPLETED_PROCESSING",
+	  "Version": "1.0.0",
+	  "Name": "Integration Flow with MessageStore - COMPLETED PROCESSING",
+	  "Type": "INTEGRATION_FLOW",
+	  "DeployedBy": "Tester",
+	  "DeployedOn": "/Date(1521463557739)/",
+	  "Status": "STARTED",
+	  "ErrorInformation": {
+		"__deferred": {
+		  "uri": "https://sandbox.api.sap.com/cpi/api/v1/IntegrationRuntimeArtifacts('IntegrationFlow_MessageStore_COMPLETED_PROCESSING')/ErrorInformation"
+		}
+	  }
+	}
+  }
+  */
+
 
 //IntegrationDesigntimeArtifacts
 func (s *CPIClient) ReadIntegrationDesigntimeArtifacts(PackageId string, fetchConfig bool) ([]*IntegrationDesigntimeArtifact, error) {
@@ -656,3 +769,4 @@ func (s *CPIClient) CheckConnection() error {
 
 	return nil
 }
+
