@@ -22,12 +22,10 @@ import (
 	"text/tabwriter"
 
 	"github.com/Trifolium-project/landscaper/packages/cpiclient"
-	"github.com/Trifolium-project/landscaper/packages/util"
 	"github.com/spf13/cobra"
 )
 
 var targetEnv *string
-var iflowList *[]string
 var toDeploy *bool
 
 // moveCmd represents the move command
@@ -42,37 +40,37 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		/*
-			finished := make(chan bool)
-			finished <- false
+		finished := make(chan bool)
+		finished <- false
 
-			bar := progressbar.DefaultBytes(
-				-1,
-				fmt.Sprintf("Transporting %s to %s...",*pkg, *targetEnv),
-			)
+		bar := progressbar.DefaultBytes(
+			-1,
+			fmt.Sprintf("Transporting %s to %s...",*pkg, *targetEnv),
+		)
+		
+		go packageMove(finished)
 
-			go packageMove(finished)
-
-			for ! <- finished {
-				bar.Add(1)
-				time.Sleep(50 * time.Millisecond)
-			}
+		for ! <- finished {
+			bar.Add(1)
+			time.Sleep(50 * time.Millisecond)
+		}
 
 		*/
 
 		//showProgress()
-		fmt.Printf("Transporting %s to %s...\n", *pkg, *targetEnv)
+		fmt.Printf("Transporting %s to %s...\n",*pkg, *targetEnv)
 		packageMove()
-
+		
+		
 	},
 }
-
 /*
 func showProgress(){
 	bar := progressbar.DefaultBytes(
 		-1,
 		fmt.Sprintf("Transporting %s to %s...",*pkg, *targetEnv),
 	)
-
+	
 	for i := 0; i < 1000; i++ {
 		bar.Add(1)
 		time.Sleep(50 * time.Millisecond)
@@ -85,7 +83,6 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	targetEnv = packageMoveCmd.Flags().String("target-env", "", "Target environment")
 	toDeploy = packageMoveCmd.Flags().BoolP("deploy", "d", false, "Indicate whether necessary to deploy changed artifacts in target environment")
-	iflowList = packageMoveCmd.Flags().StringSliceP("iflow", "f", []string{}, "List of integration flows to")
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// moveCmd.PersistentFlags().String("foo", "", "A help for foo")
@@ -107,6 +104,7 @@ func packageMove() {
 		println("Global landscape is not instantiated")
 		return
 	}
+	
 
 	originalEnvironment := globalLandscape.OriginalEnvironment
 
@@ -131,18 +129,6 @@ func packageMove() {
 	sourceArtifacts, err := originalEnvironment.System.Client.ReadIntegrationDesigntimeArtifacts(*pkg, fetchArtifactConfig)
 	if err != nil {
 		log.Fatalln(err)
-	}
-
-	//Filter out unnecessary artifacts, if iflowList is not empty
-	if len(*iflowList) > 0 {
-		var filteredSourceArtifacts []*cpiclient.IntegrationDesigntimeArtifact
-
-		for _, sourceArtifacts := range sourceArtifacts {
-			if util.Contains(*iflowList, sourceArtifacts.Id) {
-				filteredSourceArtifacts = append(filteredSourceArtifacts, sourceArtifacts)
-			}
-		}
-		sourceArtifacts = filteredSourceArtifacts
 	}
 
 	//Check that there is no artifact in draft state in source package
@@ -174,8 +160,8 @@ func packageMove() {
 			Name:        targetEnvironment.Suffix + " " + sourcePackage.Name,
 			Description: sourcePackage.Description,
 			ShortText:   sourcePackage.ShortText + "(environment - '" + targetEnvironment.Id + "')",
-			Vendor:      sourcePackage.Vendor,
-			Version:     sourcePackage.Version,
+			Vendor: sourcePackage.Vendor,
+			Version: sourcePackage.Version,
 
 			Keywords: "",
 		}
@@ -220,8 +206,8 @@ func packageMove() {
 			parameters, err := globalLandscape.GetArtifactConfiguration(*targetEnv, sourceArtifact.PackageId, sourceArtifact.Id)
 
 			id := sourceArtifact.Id + targetEnvironment.Suffix
-
-			if artifactExistsInTarget {
+			
+			if artifactExistsInTarget{
 				version := currentTargetArtifactVersions[id]
 
 				targetEnvironment.System.Client.DeleteIntegrationDesigntimeArtifact(id, version)
@@ -247,15 +233,16 @@ func packageMove() {
 
 			for _, parameter := range parameters {
 				conf := &cpiclient.Configuration{
-					ParameterKey:   parameter.Key,
+					ParameterKey: parameter.Key,
 					ParameterValue: parameter.Value,
-					DataType:       parameter.Type,
+					DataType: parameter.Type,
 				}
 				err = targetEnvironment.System.Client.UpdateIntegrationDesigntimeArtifactConfiguration(newArtifact.Id, newArtifact.Version, conf)
 				if err != nil {
 					log.Fatalln(err)
 				}
 			}
+
 
 			if *toDeploy {
 				err = targetEnvironment.System.Client.DeployIntegrationDesigntimeArtifact(newArtifact.Id, newArtifact.Version)
@@ -265,11 +252,11 @@ func packageMove() {
 
 			}
 
-			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%t\t%t\n", index+1, newArtifact.Id, newArtifact.Version, newArtifact.PackageId, true, *toDeploy)
+			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%t\t%t\n", index + 1, newArtifact.Id, newArtifact.Version, newArtifact.PackageId, true, *toDeploy)
 
 			//fmt.Fprintf(writer, "%d\t%s\t%s\n", index, pkg.Id, pkg.Name)
 		} else {
-			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%t\t%t\n", index+1, id, sourceArtifact.Version, targetPackageId, false, false)
+			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%t\t%t\n", index + 1, id, sourceArtifact.Version, targetPackageId, false, false)
 		}
 	}
 	writer.Flush()
