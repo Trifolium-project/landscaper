@@ -90,6 +90,6 @@ func artifactList() {
 		//fmt.Fprintf(writer, "%d\t%s\t%s\n", index, pkg.Id, pkg.Name)
 	}
 	writer.Flush()
-	//
+//
 
 }
