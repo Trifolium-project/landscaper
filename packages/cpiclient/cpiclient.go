@@ -770,3 +770,17 @@ func (s *CPIClient) CheckConnection() error {
 	return nil
 }
 
+
+
+
+func (artifact *IntegrationDesigntimeArtifact) GetConfiguration(parameter string) (*Configuration, error) {
+
+	for _, conf := range artifact.Configurations {
+		if conf.ParameterKey == parameter {
+			return conf, nil
+		}
+	}
+
+	return nil, fmt.Errorf("parameter %s is not found in artifact %s", parameter, artifact.Id)
+
+}
