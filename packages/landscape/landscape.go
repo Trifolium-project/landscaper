@@ -114,10 +114,9 @@ func(landscape *Landscape) GetArtifactConfiguration(environment string, pkg stri
 
 	defer func() {
         if err := recover(); err != nil {
-            log.Println("panic occurred:", err)
+            log.Printf("Configuration not found for package %s, artifact %s, env %s. Using config from original environment", pkg, artifact, environment)
         }
     }()
-
 
 	config := landscape.Packages[pkg].Artifacts[artifact].Configurations[environment].Parameters
 
@@ -241,6 +240,7 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 	for _, packageYAML := range landscapeYaml.Landscape.Packages {
 		artifacts := make(map[string]*Artifact)
 		for _, artifactYAML := range packageYAML.Artifacts {
+
 			configurations := make(map[string]*Configuration)
 			for _, configurationYAML := range artifactYAML.Configurations {
 
@@ -258,12 +258,13 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 					parameters = append(parameters, parameter)
 					
 				}
-
+				
 				configuration := &Configuration{
 					Environment: configurationYAML.Environment,
 					Parameters: parameters,
 				}
 				configurations[configuration.Environment] = configuration
+				
 			}
 
 			artifact := &Artifact{

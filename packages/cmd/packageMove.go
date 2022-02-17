@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime/debug"
 	"text/tabwriter"
 
 	"github.com/Trifolium-project/landscaper/packages/cpiclient"
@@ -100,6 +101,11 @@ func finish(finished chan bool) {
 }
 
 func packageMove() {
+	defer func() {
+        if r := recover(); r != nil {
+            fmt.Println("stacktrace from panic: \n" + string(debug.Stack()))
+        }
+    }()
 
 	//defer finish(finished)
 
@@ -246,10 +252,20 @@ func packageMove() {
 			}
 
 			for _, parameter := range parameters {
-				conf := &cpiclient.Configuration{
-					ParameterKey:   parameter.Key,
-					ParameterValue: parameter.Value,
-					DataType:       parameter.Type,
+				sourceConf, err := sourceArtifact.GetConfiguration(parameter.Key)
+				var conf  *cpiclient.Configuration
+				if err != nil {
+					conf = &cpiclient.Configuration{
+						ParameterKey:   parameter.Key,
+						ParameterValue: parameter.Value,
+						DataType:       sourceConf.DataType,
+					}
+				} else {
+					conf = &cpiclient.Configuration{
+						ParameterKey:   parameter.Key,
+						ParameterValue: parameter.Value,
+						DataType:       parameter.Type,
+					}
 				}
 				err = targetEnvironment.System.Client.UpdateIntegrationDesigntimeArtifactConfiguration(newArtifact.Id, newArtifact.Version, conf)
 				if err != nil {
