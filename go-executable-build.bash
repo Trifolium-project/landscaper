@@ -10,7 +10,7 @@ package_split=(${package//\// })
 #package_name=${package_split[-1]}
 package_name="landscaper"	
 platforms=("windows/amd64" "darwin/amd64" "darwin/arm64" "linux/amd64" "linux/arm64")
-
+echo 'Starting build...'
 for platform in "${platforms[@]}"
 do
 	platform_split=(${platform//\// })
@@ -26,4 +26,9 @@ do
    		echo 'An error has occurred! Aborting the script execution...'
 		exit 1
 	fi
+    echo 'Completed: '$output_name
 done
+echo 'Compress build...'
+zip -r build/landscaper.zip build
+
+echo 'All tasks completed successfully'
