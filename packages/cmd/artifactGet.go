@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -65,22 +64,42 @@ func artifactGet() {
 		log.Fatalln(err)
 	}
 
-	split := strings.Split(*artifact, ":")
+	//split := strings.Split(*artifact, ":")
 
-	artfct, err := system.Client.ReadIntegrationDesigntimeArtifact(split[0], split[1])
+	artfct, err := system.Client.ReadIntegrationDesigntimeArtifact(*artifact, "Active")
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
-	fmt.Fprintln(writer, "Field\tValue")
-		fmt.Fprintf(writer, "%s\t%s\n","ID", artfct.Id)
-		fmt.Fprintf(writer, "%s\t%s\n","Name", artfct.Name)
-		fmt.Fprintf(writer, "%s\t%s\n","Version", artfct.Version)
-		
-		//fmt.Fprintf(writer, "%d\t%s\t%s\n", index, pkg.Id, pkg.Name)
+	fmt.Fprintf(writer, "===Artifact metadata===\n\n")
+
+	fmt.Fprintf(writer, "%s\t%s\n", "ID:", artfct.Id)
+	fmt.Fprintf(writer, "%s\t%s\n", "Name:", artfct.Name)
+	fmt.Fprintf(writer, "%s\t%s\n", "Version:", artfct.Version)
+	fmt.Fprintf(writer, "%s\t%s\n", "Package:", artfct.PackageId)
+	
+	designtimeArtifact, err := system.Client.ReadIntegrationRuntimeArtifact(*artifact)
+	if err != nil {
+		//fmt.Println(err)
+
+		fmt.Fprintf(writer, "%s\t%s\n", "Deploy status:", "Not deployed")
+
+	} else {
+		fmt.Fprintf(writer, "%s\t%s\n", "Deploy status:", designtimeArtifact.Status)
+		fmt.Fprintf(writer, "%s\t%s\n", "Deployed version:", designtimeArtifact.Version)
+	}
+
+	conf, err := system.Client.ReadIntegrationDesigntimeArtifactConfigurations(*artifact, "Active")
+	fmt.Fprintf(writer, "\n===Configuration===\n\n")
+
+	fmt.Fprintf(writer, "Key\tValue\tType\n")
+
+	for _, configuration := range conf {
+		fmt.Fprintf(writer, "%s\t%s\t%s\n", configuration.ParameterKey, configuration.ParameterValue, configuration.DataType)
+	}
+
+	//fmt.Fprintf(writer, "%d\t%s\t%s\n", index, pkg.Id, pkg.Name)
 	writer.Flush()
-
-
 
 }
