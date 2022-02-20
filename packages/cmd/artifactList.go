@@ -25,6 +25,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var onlyDeployed *bool
+
 // listCmd represents the list command
 var artifactListCmd = &cobra.Command{
 	Use:   "list",
@@ -43,6 +45,9 @@ to quickly create a Cobra application.`,
 func init() {
 	artifactCmd.AddCommand(artifactListCmd)
 
+
+
+	onlyDeployed = artifactListCmd.Flags().Bool("only-deployed", false, "Indicate whether necessary to list only deployed artifacts")
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
@@ -73,8 +78,8 @@ func artifactList() {
 
 	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
 	fmt.Fprintln(writer, "#\tArtefactId\tVersion\tPackage\tDeploy Status\tDeployed Version")
-
-	for index, art := range artifacts {
+	index := 0
+	for _, art := range artifacts {
 		status := "unknown"
 		deployedVersion := "-"
 		designtimeArtifact, err := system.Client.ReadIntegrationRuntimeArtifact(art.Id)
@@ -86,7 +91,11 @@ func artifactList() {
 			status = designtimeArtifact.Status
 			deployedVersion = designtimeArtifact.Version
 		}
-		fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%s\t%s\n", index, art.Id, art.Version, art.PackageId, status,deployedVersion)
+		if !(*onlyDeployed && status == "Not deployed") {
+			index++
+			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%s\t%s\n", index, art.Id, art.Version, art.PackageId, status,deployedVersion)
+		}
+		
 		//fmt.Fprintf(writer, "%d\t%s\t%s\n", index, pkg.Id, pkg.Name)
 	}
 	writer.Flush()
