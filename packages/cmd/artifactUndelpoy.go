@@ -17,13 +17,16 @@ package cmd
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 )
 
 // undelpoyCmd represents the undelpoy command
 var artifactUndelpoyCmd = &cobra.Command{
-	Use:   "undelpoy",
+	Use:   "undeploy",
 	Short: "A brief description of your command",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
@@ -32,7 +35,7 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("undelpoy called")
+		artifactUndeploy()
 	},
 }
 
@@ -48,4 +51,40 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// undelpoyCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+
+func artifactUndeploy() {
+	if globalLandscape == nil {
+		println("Global landscape is not instantiated")
+		return
+	}
+
+	system, err := globalLandscape.GetSystem4Environment(environment)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	artfct, err := system.Client.ReadIntegrationRuntimeArtifact(*artifact)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	err = system.Client.UndeployIntegrationRuntimeArtifact(*artifact)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+
+	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
+	fmt.Fprintf(writer, "Undeploy started...\n\n")
+	fmt.Fprintf(writer, "===Artifact metadata===\n\n")
+
+	fmt.Fprintf(writer, "%s\t%s\n", "ID:", artfct.Id)
+	fmt.Fprintf(writer, "%s\t%s\n", "Name:", artfct.Name)
+	fmt.Fprintf(writer, "%s\t%s\n", "Version:", artfct.Version)
+	fmt.Fprintf(writer, "%s\t%s\n", "Type:", artfct.Type)
+
+	writer.Flush()
+
 }

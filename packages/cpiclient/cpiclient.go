@@ -575,6 +575,34 @@ func (s *CPIClient) DeleteIntegrationDesigntimeArtifact(ArtifactId string, Artif
 
 }
 
+
+func (s *CPIClient) UndeployIntegrationRuntimeArtifact(ArtifactId string) (error) {
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationRuntimeArtifacts(Id='" +
+		ArtifactId + "')")
+
+	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodDelete, url, nil)
+
+	if err != nil {
+		return err
+	}
+
+	token, err := s.getCSRFToken()
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("X-CSRF-Token", token)
+
+	_, _, err = s.doRequest(req)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+
 /*
 func (s *CPIClient) undeployIntegrationDesigntimeArtifact(ArtifactId string, ArtifactVersion string ) (error) {
 
