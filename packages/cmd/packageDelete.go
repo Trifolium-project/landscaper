@@ -24,15 +24,10 @@ import (
 // deleteCmd represents the delete command
 var packageDeleteCmd = &cobra.Command{
 	Use:   "delete",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Delete integration package(not implemented)",
+	Long: `Delete integration package(not implemented)`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("delete called")
+		fmt.Println("delete called(not implemented)")
 	},
 }
 
