@@ -7,7 +7,7 @@ Standard CPI landscape consists of two systems - dev and prod. Transport system 
 Example of heterogenius corporate landscape:
 ![Example corporate landscape](./assets/img/corp-landscape.jpg "Example corporate landscape")
 
-You can see, that corporate systems can have number of instances more than two, but SAP CPI often is limited by two tenants. Picture illustrates, how you can connect different environments to Dev and Prod CPI tenants.
+You can see, that corporate systems can have number of instances more than two, but SAP CPI often is limited by two tenants. Picture illustrates, how you can connect different environments to Dev and Prod CPI tenants using landscaper.
 
 ### Quick start
 
