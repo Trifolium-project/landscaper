@@ -4,7 +4,7 @@
 
 Standard CPI landscape consists of two systems - dev and prod. Transport system is only capable of transferring integration packages from one tenant to another. Hosting two or more landscapes in one integration tenant is not supported natively by SAP. Therefore this solution helps to overcome this limitation, and have consistent development - test - prod landscape using two(or even one) integration tenant. Actually, multiple variants are supported for those who have heterogenious integration landscape. You can define number of stages and hosting tenants for each integration package. Therefore it is advised to split you developments by integration packages in order to make convenient setup.
 
-Example of heterogenius corporate landscape:
+Example of heterogeneous corporate landscape:
 ![Example corporate landscape](./assets/img/corp-landscape.jpg "Example corporate landscape")
 
 You can see, that corporate systems can have number of instances more than two, but SAP CPI often is limited by two tenants. Picture illustrates, how you can connect different environments to Dev and Prod CPI tenants using landscaper.
