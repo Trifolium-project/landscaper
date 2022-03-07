@@ -1,0 +1,19 @@
+#Minimal example of landscape declaration
+landscape:
+  name: Test env
+  systems:
+    - id: dev
+      name: Development Tenant 
+      host: xxxxxxx-tmn.hci.ru1.hana.ondemand.com
+      login: DEV_LOGIN_ENV_VAR
+      password: DEV_PASSWORD_ENV_VAR
+  environments:
+    - id: Dev
+      name: Development Environment
+      suffix: null
+      system: dev
+    - id: QA
+      name: QA Environment
+      suffix: QA
+      system: dev
+  originalEnvironment: Dev

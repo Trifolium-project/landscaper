@@ -1,18 +1,232 @@
-# Landscaper - CI/CD support for SAP Cloud Integration
+# Landscaper - Transport and CI/CD support for SAP Cloud Integration
 
 ## How to have multiple integration landscapes in one CPI tenant 
 
 Standard CPI landscape consists of two systems - dev and prod. Transport system is only capable of transferring integration packages from one tenant to another. Hosting two or more landscapes in one integration tenant is not supported natively by SAP. Therefore this solution helps to overcome this limitation, and have consistent development - test - prod landscape using two(or even one) integration tenant. Actually, multiple variants are supported for those who have heterogenious integration landscape. You can define number of stages and hosting tenants for each integration package. Therefore it is advised to split you developments by integration packages in order to make convenient setup.
 
-### Really quick start
-TODO
+### Quick start
 
-### Usage
+1. Install landscaper
 
- - Create landscape definition, as per [example](./conf/landscape-example.yaml)
- - Start using transport system
+ - Download latest release from [Releases](https://github.com/Trifolium-project/landscaper/releases)
+
+2. Prerequisites
+
+
+ - Create directory
+```bash
+mkdir -p  ~/Documents/demo-landscape/conf && cd ~/Documents/demo-landscape
 ```
-landscaper package move --target-env=Prod --pkg=SAPHybrisCloudforCustomerIntegrationwithSAPCRM 
+ - Add landscape minimal config
+```bash
+cat <<EOT >> ~/Documents/demo-landscape/conf/landscape.yaml
+#Minimal example of landscape declaration
+landscape:
+  name: Test env
+  systems:
+    - id: dev
+      name: Development Tenant 
+      host: xxxxxxx-tmn.hci.ru1.hana.ondemand.com #CHANGE HOST
+      login: DEV_LOGIN_ENV_VAR
+      password: DEV_PASSWORD_ENV_VAR
+  environments:
+    - id: Dev
+      name: Development Environment
+      suffix: null
+      system: dev
+    - id: QA
+      name: QA Environment
+      suffix: QA
+      system: dev
+  originalEnvironment: Dev
+EOT
+```
+ - Add credentials
+ 
+User must have appropriate authorizations in order to access SAP CPI API
+```bash
+cat <<EOT >> ~/Documents/demo-landscape/.env
+DEV_LOGIN_ENV_VAR=S0012345678
+DEV_PASSWORD_ENV_VAR=1qazxsw23edcvfr4
+EOT
+```
+
+3. Use landscaper
+
+ - Copy package from discover to design area
+
+```bash
+landscaper package copy --pkg=SAPAribaAnalyticalReportingIntegrationwithThirdParty --env=Dev
+```
+
+```bash
+===Package metadata===
+
+ID:             SAPAribaAnalyticalReportingIntegrationwithThirdParty
+Name:           SAP Ariba Integration with Third-Party for Analytical Reporting
+Version:        1.0.0
+ShortText:      The integration package provides iFlows for consumption of Ariba APIs for Analytical Reporting ( Standard/Custom Templates) with CSV Output for integrating with Third Party
+
+===Artifact list===
+
+#       ArtefactId                                                              Version Name
+1       Common_Resource_-_Job_Request                                           1.0.3   Common Resource - Job Request
+2       Common_Resource_-_Job_Store                                             1.0.5   Common Resource - Job Store
+3       Analytical_Reporting_-_Template_Name_-_Async_Fetch_and_Reporting        1.0.2   Analytical Reporting - Template Name - Async Fetch and Reporting
+4       Generic_Report_Content_Generation                                       1.0.1   Generic Report Content Generation
+```
+
+Package in SAP CPI:
+![Package copy result](./assets/img/copy-result-cpi.jpg "Package copy result")
+
+Artifacts in package:
+![Artifact list in package](./assets/img/copy-result-cpi-2.jpg "Artifact list")
+
+ - Deploy artifact
+
+```bash
+landscaper artifact deploy --env=Dev --artifact=Generic_Report_Content_Generation
+```
+
+```bash
+Deploy started...
+
+===Artifact metadata===
+
+ID:             Generic_Report_Content_Generation
+Name:           Generic Report Content Generation
+Version:        1.0.1
+Package:        SAPAribaAnalyticalReportingIntegrationwithThirdParty
+```
+Deployed artifact:
+![Deployed artifact](./assets/img/deploy-result.jpg "Deployed artifact")
+
+ - Get artifact data
+
+```bash
+landscaper artifact get --env=Dev --artifact=Generic_Report_Content_Generation 
+```
+
+```bash
+===Artifact metadata===
+
+ID:                     Generic_Report_Content_Generation
+Name:                   Generic Report Content Generation
+Version:                1.0.1
+Package:                SAPAribaAnalyticalReportingIntegrationwithThirdParty
+Deploy status:          STARTED
+Deployed version:       1.0.1
+
+===Configuration===
+
+Key             Value                                   Type
+Endpoint        /OpenAPI/ReportContentGeneration        xsd:string
+```
+
+ - Update landscape definition, add configuration for integration flow in QA environment
+
+```bash
+cat <<EOT >> ~/Documents/demo-landscape/conf/landscape.yaml
+#Minimal example of landscape declaration
+landscape:
+  name: Test env
+  systems:
+    - id: dev
+      name: Development Tenant 
+      host: xxxxxxx-tmn.hci.ru1.hana.ondemand.com #CHANGE HOST
+      login: DEV_LOGIN_ENV_VAR
+      password: DEV_PASSWORD_ENV_VAR
+  packages:
+    - id: SAPAribaAnalyticalReportingIntegrationwithThirdParty
+      artifacts:
+        - id: Generic_Report_Content_Generation
+          configurations:
+            - environment: QA
+              parameters:
+                - key: Endpoint
+                  value: /QA/OpenAPI/ReportContentGeneration
+  environments:
+    - id: Dev
+      name: Development Environment
+      suffix: null
+      system: dev
+    - id: QA
+      name: QA Environment
+      suffix: QA
+      system: dev
+  originalEnvironment: Dev
+EOT
+```
+
+
+ - Move package and one of the artifacts to QA env
+
+```bash
+landscaper package move --target-env=QA --pkg=SAPAribaAnalyticalReportingIntegrationwithThirdParty --iflow=Generic_Report_Content_Generation
+```
+
+```bash
+Transporting SAPAribaAnalyticalReportingIntegrationwithThirdParty to QA...
+#	ArtefactId				                  Version	Package							                                    Transferred to QA	Deployed
+1	Generic_Report_Content_GenerationQA	1.0.1	  SAPAribaAnalyticalReportingIntegrationwithThirdPartyQA	true			false
+```
+
+ - Get artifact data in QA
+
+```bash
+landscaper artifact get --env=QA --artifact=Generic_Report_Content_GenerationQA 
+```
+
+```bash
+===Artifact metadata===
+
+ID:		Generic_Report_Content_GenerationQA
+Name:		Generic Report Content Generation QA
+Version:	1.0.1
+Package:	SAPAribaAnalyticalReportingIntegrationwithThirdPartyQA
+Deploy status:	Not deployed
+
+===Configuration===
+
+Key       Value					                      Type
+Endpoint	/QA/OpenAPI/ReportContentGeneration	xsd:string
+```
+
+
+
+ - Deploy artifact in QA
+
+```bash 
+landscaper artifact deploy --env=QA --artifact=Generic_Report_Content_GenerationQA
+```
+
+ - Make some changes in integration flow, save new version
+
+![Change iflow](./assets/img/change-iflow.jpg "Change iflow")
+
+
+ - Move delta changes to QA env, and deploy immediately
+
+
+```bash
+landscaper package move --pkg=SAPAribaAnalyticalReportingIntegrationwithThirdParty --target-env=QA --iflow=Generic_Report_Content_Generation --deploy
+```
+
+```bash
+Transporting SAPAribaAnalyticalReportingIntegrationwithThirdParty to QA...
+#	ArtefactId				Version	Package							Transferred to QA	Deployed
+1	Generic_Report_Content_GenerationQA	1.0.2	SAPAribaAnalyticalReportingIntegrationwithThirdPartyQA	true			true
+```
+
+ - Get list of artifacts for package
+```bash
+landscaper artifact list --pkg=SAPAribaAnalyticalReportingIntegrationwithThirdPartyQA --env=QA
+```
+
+```bash
+#	ArtefactId				Version	Package							Deploy Status	Deployed Version
+1	Generic_Report_Content_GenerationQA	1.0.2	SAPAribaAnalyticalReportingIntegrationwithThirdPartyQA	STARTED		1.0.2
+
 ```
 
 
