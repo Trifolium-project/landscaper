@@ -6,9 +6,33 @@ Standard CPI landscape consists of two systems - dev and prod. Transport system 
 
 ### Quick start
 
-1. Install landscaper
+0. Get landscaper
 
  - Download latest release from [Releases](https://github.com/Trifolium-project/landscaper/releases)
+ 
+ - OR build from source
+
+```bash
+git clone git@github.com:Trifolium-project/landscaper.git
+```
+
+```bash
+./go-executable-build.bash .
+```
+
+1. Install landscaper
+
+ - Unpack landscaper.zip
+```bash
+unzip landscaper.zip
+```
+ - Move executable to PATH folder. Select appropriate executable, for example for Apple Silicon processors:
+
+```bash
+sudo mv build/landscaper-darwin-arm64 /usr/local/bin/landscaper
+```
+
+
 
 2. Prerequisites
 
