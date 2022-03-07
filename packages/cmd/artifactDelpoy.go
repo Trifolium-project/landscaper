@@ -17,22 +17,20 @@ package cmd
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 )
 
 // delpoyCmd represents the delpoy command
 var artifactDelpoyCmd = &cobra.Command{
-	Use:   "delpoy",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Use:   "deploy",
+	Short: "Deploy artifact to runtime",
+	Long: `Deploy artifact to runtime`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("delpoy called")
+		artifactDeploy()
 	},
 }
 
@@ -48,4 +46,41 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// delpoyCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+
+func artifactDeploy() {
+	if globalLandscape == nil {
+		println("Global landscape is not instantiated")
+		return
+	}
+
+	system, err := globalLandscape.GetSystem4Environment(environment)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	//split := strings.Split(*artifact, ":")
+
+	artfct, err := system.Client.ReadIntegrationDesigntimeArtifact(*artifact, "Active")
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	err = system.Client.DeployIntegrationDesigntimeArtifact(artfct.Id, artfct.Version)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	
+	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
+	fmt.Fprintf(writer, "Deploy started...\n\n")
+	fmt.Fprintf(writer, "===Artifact metadata===\n\n")
+
+	fmt.Fprintf(writer, "%s\t%s\n", "ID:", artfct.Id)
+	fmt.Fprintf(writer, "%s\t%s\n", "Name:", artfct.Name)
+	fmt.Fprintf(writer, "%s\t%s\n", "Version:", artfct.Version)
+	fmt.Fprintf(writer, "%s\t%s\n", "Package:", artfct.PackageId)
+
+	writer.Flush()
+
 }

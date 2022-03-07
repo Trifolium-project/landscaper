@@ -575,6 +575,34 @@ func (s *CPIClient) DeleteIntegrationDesigntimeArtifact(ArtifactId string, Artif
 
 }
 
+
+func (s *CPIClient) UndeployIntegrationRuntimeArtifact(ArtifactId string) (error) {
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationRuntimeArtifacts(Id='" +
+		ArtifactId + "')")
+
+	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodDelete, url, nil)
+
+	if err != nil {
+		return err
+	}
+
+	token, err := s.getCSRFToken()
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("X-CSRF-Token", token)
+
+	_, _, err = s.doRequest(req)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+
 /*
 func (s *CPIClient) undeployIntegrationDesigntimeArtifact(ArtifactId string, ArtifactVersion string ) (error) {
 
@@ -754,6 +782,67 @@ func (s *CPIClient) CreateIntegrationPackage(integrationPackage *IntegrationPack
 	}
 
 	return nil
+}
+
+
+func (s *CPIClient) CopyIntegrationPackageFromDiscover(DiscoverPackageId string) (*IntegrationPackage, error) {
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "CopyIntegrationPackage?" + "$format=json" + "&Id='" +  DiscoverPackageId + "'")
+
+	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodPost, url, nil)
+	//req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := s.getCSRFToken()
+	if err != nil {
+		return nil, err
+	}
+
+	//req.Header["x-csrf-token"] = []string{token}
+	//req.Header.Del("Accept-Encoding")
+
+	req.Header.Set("X-CSRF-Token", token)
+	req.Header.Set("Content-Type", "application/json")
+
+	bytes, _, err := s.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var data map[string]interface{}
+
+	err = json.Unmarshal(bytes, &data)
+	if err != nil {
+		return nil, err
+	}
+
+	root := data["d"].((map[string]interface{}))
+
+	integrationPackage := &IntegrationPackage{
+		Id:                root["Id"].(string),
+		Name:              root["Name"].(string),
+		Description:       root["Description"].(string),
+		ShortText:         root["ShortText"].(string),
+		Version:           root["Version"].(string),
+		/*
+		Vendor:            root["Vendor"].(string),
+		Mode:              root["Mode"].(string),
+		SupportedPlatform: root["SupportedPlatform"].(string),
+		ModifiedBy:        root["ModifiedBy"].(string),
+		CreationDate:      root["CreationDate"].(string),
+		ModifiedDate:      root["ModifiedDate"].(string),
+		CreatedBy:         root["CreatedBy"].(string),
+		Products:          root["Products"].(string),
+		Keywords:          root["Keywords"].(string),
+		Countries:         root["Countries"].(string),
+		Industries:        root["Industries"].(string),
+		LineOfBusiness:    root["LineOfBusiness"].(string),
+		PackageContent:    "", 
+		*/
+	}
+
+	return integrationPackage, nil
 }
 
 func (s *CPIClient) CheckConnection() error {

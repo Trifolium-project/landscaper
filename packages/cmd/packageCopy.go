@@ -25,17 +25,17 @@ import (
 )
 
 // getCmd represents the get command
-var artifactGetCmd = &cobra.Command{
-	Use:   "get",
-	Short: "Get artifact metadata and configuration",
-	Long: `Get artifact metadata and configuration`,
+var packageCopyCmd = &cobra.Command{
+	Use:   "copy",
+	Short: "Package copy from discover to design tab",
+	Long:  `Package copy from discover to design tab`,
 	Run: func(cmd *cobra.Command, args []string) {
-		artifactGet()
+		packageCopy()
 	},
 }
 
 func init() {
-	artifactCmd.AddCommand(artifactGetCmd)
+	packageCmd.AddCommand(packageCopyCmd)
 
 	// Here you will define your flags and configuration settings.
 
@@ -48,7 +48,7 @@ func init() {
 	// getCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func artifactGet() {
+func packageCopy() {
 	if globalLandscape == nil {
 		println("Global landscape is not instantiated")
 		return
@@ -61,40 +61,34 @@ func artifactGet() {
 
 	//split := strings.Split(*artifact, ":")
 
-	artfct, err := system.Client.ReadIntegrationDesigntimeArtifact(*artifact, "Active")
+	pkgObj, err := system.Client.CopyIntegrationPackageFromDiscover(*pkg)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
-	fmt.Fprintf(writer, "===Artifact metadata===\n\n")
+	fmt.Fprintf(writer, "===Package metadata===\n\n")
 
-	fmt.Fprintf(writer, "%s\t%s\n", "ID:", artfct.Id)
-	fmt.Fprintf(writer, "%s\t%s\n", "Name:", artfct.Name)
-	fmt.Fprintf(writer, "%s\t%s\n", "Version:", artfct.Version)
-	fmt.Fprintf(writer, "%s\t%s\n", "Package:", artfct.PackageId)
-	
-	designtimeArtifact, err := system.Client.ReadIntegrationRuntimeArtifact(*artifact)
+	fmt.Fprintf(writer, "%s\t%s\n", "ID:", pkgObj.Id)
+	fmt.Fprintf(writer, "%s\t%s\n", "Name:", pkgObj.Name)
+	fmt.Fprintf(writer, "%s\t%s\n", "Version:", pkgObj.Version)
+	fmt.Fprintf(writer, "%s\t%s\n", "ShortText:", pkgObj.ShortText)
+
+	fmt.Fprintf(writer, "\n===Artifact list===\n\n")
+
+	artifacts, err := system.Client.ReadIntegrationDesigntimeArtifacts(*pkg, false)
 	if err != nil {
-		//fmt.Println(err)
-
-		fmt.Fprintf(writer, "%s\t%s\n", "Deploy status:", "Not deployed")
-
-	} else {
-		fmt.Fprintf(writer, "%s\t%s\n", "Deploy status:", designtimeArtifact.Status)
-		fmt.Fprintf(writer, "%s\t%s\n", "Deployed version:", designtimeArtifact.Version)
+		log.Fatalln(err)
 	}
 
-	conf, err := system.Client.ReadIntegrationDesigntimeArtifactConfigurations(*artifact, "Active")
-	fmt.Fprintf(writer, "\n===Configuration===\n\n")
+	fmt.Fprintln(writer, "#\tArtefactId\tVersion\tName")
 
-	fmt.Fprintf(writer, "Key\tValue\tType\n")
+	for index, art := range artifacts {
+		fmt.Fprintf(writer, "%d\t%s\t%s\t%s\n", index, art.Id, art.Version, art.Name)
 
-	for _, configuration := range conf {
-		fmt.Fprintf(writer, "%s\t%s\t%s\n", configuration.ParameterKey, configuration.ParameterValue, configuration.DataType)
 	}
 
-	//fmt.Fprintf(writer, "%d\t%s\t%s\n", index, pkg.Id, pkg.Name)
+
 	writer.Flush()
 
 }
