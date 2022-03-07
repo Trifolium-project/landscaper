@@ -13,6 +13,7 @@ You can see, that corporate systems can have number of instances more than two, 
 
 0. Get landscaper
 
+
  - Download latest release from [Releases](https://github.com/Trifolium-project/landscaper/releases)
  
  - OR build from source
@@ -219,6 +220,7 @@ Deploy status:	Not deployed
 
 Key       Value					                      Type
 Endpoint	/QA/OpenAPI/ReportContentGeneration	xsd:string
+
 ```
 
 
