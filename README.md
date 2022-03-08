@@ -370,4 +370,4 @@ Each package have next parameters:
 
 #### **Artifact**
 
-Now, only integration flows are supported, but it is also planned to add other objects. 
+Now, only integration flows are supported, but it is also planned to add other objects, such as Value Mappings and Script Collections.
