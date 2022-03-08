@@ -31,4 +31,11 @@ done
 echo 'Compress build...'
 zip -r build/landscaper.zip build
 
+echo 'Clean files...'
+rm build/landscaper-windows-amd64.exe
+rm build/landscaper-darwin-amd64
+rm build/landscaper-darwin-arm64
+rm build/landscaper-linux-amd64
+rm build/landscaper-linux-arm64
+
 echo 'All tasks completed successfully'
