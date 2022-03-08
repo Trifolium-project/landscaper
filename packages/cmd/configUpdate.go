@@ -16,8 +16,6 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -27,13 +25,14 @@ var configUpdateCmd = &cobra.Command{
 	Short: "Update config(not implemented)",
 	Long: `Read config(not implemented)`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("update called(not implemented)")
+		configUpdate()
 	},
 }
 
 func init() {
 	configCmd.AddCommand(configUpdateCmd)
 
+	artifact = artifactCmd.PersistentFlags().String("artifact", "", "Artifact Id")
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
@@ -43,4 +42,8 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// updateCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+func configUpdate(){
+	
 }
