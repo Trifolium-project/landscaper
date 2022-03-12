@@ -27,6 +27,7 @@ import (
 )
 
 var cfgFile string
+var landscapeFile *string
 var globalLandscape *landscape.Landscape
 
 //Persistent global flag
@@ -63,8 +64,8 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.landscaper.yaml)")
-
 	environment = rootCmd.PersistentFlags().String("env", "", "Environemnt")
+	landscapeFile = rootCmd.PersistentFlags().String("landscape-file", "", "Path to landscape configuration file")
 	pkg = rootCmd.PersistentFlags().String("pkg", "", "Package")
 
 	artifact = rootCmd.PersistentFlags().String("artifact", "", "Artifact Id")
@@ -79,7 +80,16 @@ func initConfig() {
 
 	_ = godotenv.Load()
 
-	landscape, err := landscape.NewLandscape("conf/landscape-prod.yaml")
+	//Set landscape configuration path
+	var landscapeFilePath string 
+	if *landscapeFile  != "" {
+		landscapeFilePath = *landscapeFile 
+	} else {
+		//Default landscape file location
+		landscapeFilePath = "conf/landscape.yaml"
+	}
+
+	landscape, err := landscape.NewLandscape(landscapeFilePath)
 	if err != nil {
 		log.Println(err)	
 	} 
