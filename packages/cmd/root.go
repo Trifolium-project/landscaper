@@ -33,6 +33,7 @@ var globalLandscape *landscape.Landscape
 var (
 	environment *string
 	pkg         *string
+	artifact 	*string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -65,6 +66,8 @@ func init() {
 
 	environment = rootCmd.PersistentFlags().String("env", "", "Environemnt")
 	pkg = rootCmd.PersistentFlags().String("pkg", "", "Package")
+
+	artifact = rootCmd.PersistentFlags().String("artifact", "", "Artifact Id")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.

@@ -34,6 +34,8 @@ var configCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(configCmd)
 
+	//artifact = artifactCmd.PersistentFlags().String("artifact", "", "Artifact Id")
+
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
