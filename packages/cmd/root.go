@@ -97,6 +97,22 @@ func initConfig() {
 		log.Fatalln("Unable to read landscaper configuration")
 	}
 	globalLandscape = landscape
+
+	env, err := landscape.GetEnvironment(*environment)
+	if err != nil {
+		log.Fatalln(err)	
+	}
+	
+	//Add environment suffix to package name
+	if(*pkg != ""){
+		*pkg = *pkg + env.Suffix
+	}
+
+	//Add environment suffix to artifact name	
+	if(*artifact != ""){
+		*artifact = *artifact + env.Suffix
+	}
+	
 	//fmt.Println(globalLandscape)
 	//log.Println("Read integration packages")
 	//packages, _ := globalLandscape.Systems["dev"].Client.ReadIntegrationPackages()
