@@ -19,7 +19,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var artifact *string
+//var artifact *string
 
 // artifactCmd represents the artifact command
 var artifactCmd = &cobra.Command{
@@ -37,7 +37,7 @@ func init() {
 	rootCmd.AddCommand(artifactCmd)
 	
 	//testing.printText()
-	artifact = artifactCmd.PersistentFlags().String("artifact", "", "Artifact Id")
+	
 
 	// Here you will define your flags and configuration settings.
 
