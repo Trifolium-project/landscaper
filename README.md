@@ -373,5 +373,4 @@ Each package have next parameters:
 
 Now, only integration flows are supported, but it is also planned to add other objects, such as Value Mappings and Script Collections.
 
-You need to add artifact information, if it is necessary to maintain different configuration for each environment.
-
+You need to add artifact information, if it is necessary to maintain different configuration for each environment. For example, you may need to maintain different endpoints to external systems and credential aliases for each environment. Keep in mind, that all configuration parameters, that are not mentioned in landscape.yaml file, value from original environment will be copied. This means, that you can omit all parameters, that are not changing between environments, in landscape.yaml. This will help to keep configuration file clean.
