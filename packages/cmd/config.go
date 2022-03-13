@@ -16,23 +16,25 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
 // configCmd represents the config command
 var configCmd = &cobra.Command{
 	Use:   "config",
-	Short: "Config landscaper(Not implemented)",
-	Long: `Config landscaper(Not implemented)`,
+	Short: "Artifact config management",
+	Long: `Artifact config management`,
+	/*
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("config called(Not implemented)")
 	},
+	*/
 }
 
 func init() {
 	rootCmd.AddCommand(configCmd)
+
+	//artifact = artifactCmd.PersistentFlags().String("artifact", "", "Artifact Id")
 
 	// Here you will define your flags and configuration settings.
 

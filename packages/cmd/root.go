@@ -27,12 +27,14 @@ import (
 )
 
 var cfgFile string
+var landscapeFile *string
 var globalLandscape *landscape.Landscape
 
 //Persistent global flag
 var (
 	environment *string
 	pkg         *string
+	artifact 	*string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -62,9 +64,11 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.landscaper.yaml)")
-
 	environment = rootCmd.PersistentFlags().String("env", "", "Environemnt")
+	landscapeFile = rootCmd.PersistentFlags().String("landscape-file", "", "Path to landscape configuration file")
 	pkg = rootCmd.PersistentFlags().String("pkg", "", "Package")
+
+	artifact = rootCmd.PersistentFlags().String("artifact", "", "Artifact Id")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -76,7 +80,16 @@ func initConfig() {
 
 	_ = godotenv.Load()
 
-	landscape, err := landscape.NewLandscape("conf/landscape-prod.yaml")
+	//Set landscape configuration path
+	var landscapeFilePath string 
+	if *landscapeFile  != "" {
+		landscapeFilePath = *landscapeFile 
+	} else {
+		//Default landscape file location
+		landscapeFilePath = "conf/landscape.yaml"
+	}
+
+	landscape, err := landscape.NewLandscape(landscapeFilePath)
 	if err != nil {
 		log.Println(err)	
 	} 
@@ -84,6 +97,22 @@ func initConfig() {
 		log.Fatalln("Unable to read landscaper configuration")
 	}
 	globalLandscape = landscape
+
+	env, err := landscape.GetEnvironment(*environment)
+	if err != nil {
+		log.Fatalln(err)	
+	}
+	
+	//Add environment suffix to package name
+	if(*pkg != ""){
+		*pkg = *pkg + env.Suffix
+	}
+
+	//Add environment suffix to artifact name	
+	if(*artifact != ""){
+		*artifact = *artifact + env.Suffix
+	}
+	
 	//fmt.Println(globalLandscape)
 	//log.Println("Read integration packages")
 	//packages, _ := globalLandscape.Systems["dev"].Client.ReadIntegrationPackages()
