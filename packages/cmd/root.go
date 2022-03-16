@@ -98,6 +98,11 @@ func initConfig() {
 	}
 	globalLandscape = landscape
 
+	//Set default environment
+	if(*environment == "" ){
+		*environment = globalLandscape.OriginalEnvironment.Id
+	}
+
 	env, err := landscape.GetEnvironment(*environment)
 	if err != nil {
 		log.Fatalln(err)	
