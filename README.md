@@ -9,6 +9,8 @@ Example of heterogeneous corporate landscape:
 
 You can see, that corporate systems can have number of instances more than two, but SAP CPI often is limited by two tenants. Picture illustrates, how you can connect different environments to Dev and Prod CPI tenants using landscaper.
 
+Below you can find zoomed example of development tenant. It can contain multiple "environments", for example Dev, QA and Pre-Prod. Transport process is automated, so you can transfer new versions of integration content from Dev to QA and Pre-Prod very quickly. Overall speed of changes, durability and number of deployments is raised. 
+
 ### Quick start
 
 0. Get landscaper
