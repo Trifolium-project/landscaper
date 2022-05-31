@@ -379,3 +379,91 @@ Now, only integration flows are supported, but it is also planned to add other o
 
 
 You need to add artifact information, if it is necessary to maintain different configuration for each environment. For example, you may need to maintain different endpoints to external systems and credential aliases for each environment. Keep in mind, that all configuration parameters, that are not mentioned in landscape.yaml file, value from original environment will be copied. This means, that you can omit all parameters, that are not changing between environments, in landscape.yaml. This will help to keep configuration file clean.
+
+
+## How to work with templates in SAP CPI (beta)
+
+### Problem statement
+
+There is a frequent demand to have so called "template" integration flows, which developer can copy and then configure in nessessary way for specific integration. This can be achieved in SAP Cloud Integration by creating separate package for templates, create multiple template iflows for your needs, and then copy them on demand.
+
+Diagram of template approach:
+![Diagram of template approach](./assets/img/templates.jpg "Diagram of template approach")
+
+Above approach works well until you need to change something in the template. It is basic desire to have the changes populated to the specific implementations of each template, but for now this task is hardly achievable and involves tedious manual work:
+  - Save configurations of target iflow
+  - Delete target iflow
+  - Copy template to target iflow
+  - Configure and deploy
+
+Of course these steps should be multiplied by the number of iflows, which are created from the template, which very quickly becomes nigtmare.
+
+
+### Solution
+
+Thanks to the SAP Cloud Integration API the steps above can be automated. The process itself is very similar to the **package move** command of landscaper, because the idea is the same - update version of the integration flow and preserve it's configuration, but there are some differences.
+
+
+Diagram of template update approach:
+![Diagram of template update approach](./assets/img/templates-auto-update.jpg "Diagram of template update approach")
+
+Configuration for template-based integration flows in **landscape.yaml** should have additional parameter - **template**:
+
+
+```yaml
+#Minimal example of landscape declaration with templates
+landscape:
+  name: Test env
+  systems:
+    - id: dev
+      name: Development Tenant 
+      host: xxxxxxx-tmn.hci.ru1.hana.ondemand.com
+      login: DEV_LOGIN_ENV_VAR
+      password: DEV_PASSWORD_ENV_VAR
+  packages:
+    - id: PackageWithTemplateBasedIflows
+      artifacts:
+        - id: Template1_impl
+          template: Template1 #<<<====This parameter
+          configurations:
+            - environment: QA
+              parameters:
+                - key: Endpoint
+                  value: /qa/iflow1
+    - id: AnotherPackageWithTemplateBasedIflows
+      artifacts:
+        - id: Template1_impl2
+          template: Template1 #<<<====This parameter
+          configurations:
+            - environment: QA
+              parameters:
+                - key: Endpoint
+                  value: /qa/iflow2  
+  environments:
+    - id: Dev
+      name: Development Environment
+      suffix: null
+      system: dev
+    - id: QA
+      name: QA Environment
+      suffix: QA
+      system: dev
+  originalEnvironment: Dev
+```
+
+This is the only configuration, which you need to add in order to support template updates. After that you can change your template integration flow, save it as a version, and run new command for iflow upgrade:
+
+```bash
+landscaper artifact upgrade --template=Template1 
+```
+
+This command will perform checks and update all implementations of the selected template. Resulting list contains list of upgraded iflows.
+```bash
+#       ArtefactId       Version Package                         Upgraded        Deployed
+1       Template1_impl   1.0.15  TemplateImplementation          true            false
+2       Template1_impl2  1.0.15  TemplateImplementation          true            false
+```
+
+As a result, you have upgraded version of your integration flows with the same configuration as before.
+
+*In order to run above command you should have landscaper installed, and be familliar with landscape.yaml definition. Please refer [quick start](#quick-start).*

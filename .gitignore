@@ -5,3 +5,5 @@ landscape-prod.yaml
 landscaper
 build
 .swp
+.vscode
+conf/landscape.yaml

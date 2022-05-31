@@ -162,6 +162,8 @@ func NewCPIBasicAuthClient(username, password, url string, verbose bool) *CPICli
 	}
 }
 
+
+
 func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 	req.SetBasicAuth(s.Username, s.Password)
 	if s.VerboseLog {
