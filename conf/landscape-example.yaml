@@ -16,6 +16,7 @@ landscape:
     - id: SAPHybrisCloudforCustomerIntegrationwithSAPCRM
       artifacts:
         - id: com.sap.scenarios.crm2cod.simpleconnectivity
+          template: template_integration_flow_id
           configurations:
             - environment: QA
               parameters:

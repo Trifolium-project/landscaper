@@ -58,6 +58,7 @@ type Package struct {
 
 type Artifact struct {
 	Id string
+	Template string
 	Configurations map[string]*Configuration
 }
 
@@ -88,6 +89,7 @@ type LandscapeYAML struct {
 			Id string
 			Artifacts []struct{
 				Id string
+				Template string
 				Configurations []struct{
 					Environment string
 					Parameters []struct{
@@ -147,6 +149,24 @@ func(landscape *Landscape) GetEnvironment(environment string) (*Environment, err
 
 
 	return env, nil
+}
+
+//Get list of artifacts, that are based on selected template
+func (landscape *Landscape) GetArtifactsByTemplate(template string) ([]*Artifact) {
+	var artifactList []*Artifact
+
+	for _, pkg := range landscape.Packages {
+		for _, artifact := range pkg.Artifacts {
+			if(artifact.Template == template){
+				artifactList = append(artifactList, artifact)
+				//add artifact to return array
+			}
+
+		}
+	}
+
+	return artifactList
+
 }
 
 func NewLandscape(configFile string) (*Landscape, error) {
@@ -269,6 +289,7 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 
 			artifact := &Artifact{
 				Id: artifactYAML.Id,
+				Template: artifactYAML.Template,
 				Configurations: configurations,
 			}
 
