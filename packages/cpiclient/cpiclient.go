@@ -161,6 +161,8 @@ func NewCPIBasicAuthClient(username, password, tokenURL, url string, verbose boo
 	}
 }
 
+
+
 func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 
 	s.setAuth(req)
