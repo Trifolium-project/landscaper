@@ -11,7 +11,12 @@ Never commit directly to `develop` or `main`. All work happens on short-lived fe
 
 ## Merge strategy
 
-Historically, PRs into both `develop` and `main` were merged using **squash/rebase merge** (GitHub produces single-parent commits like `Develop (#76)`). Stick with this consistently for both directions (`feature → develop` and `develop → main`). Mixing merge strategies between the same two branches causes the local branch to silently diverge from its remote counterpart — different commit graphs even when the file content is identical — which then produces real merge conflicts and non-fast-forward pushes down the line.
+Use **different strategies for the two directions**:
+
+- **`feature → develop`: squash merge.** Feature branches are short-lived and disposable, so squashing them into one commit keeps `develop`'s log readable. Nothing else depends on a feature branch's internal history, so this is safe.
+- **`develop → main`: a real merge commit (not squash, not rebase).** This is the one that matters: a merge commit makes `develop` a proper ancestor of `main`, so both branches share commit history and stay trivially in sync with a plain `git pull` afterward.
+
+Squash-merging `develop → main` was the historical convention in this repo (commits like `Develop (#76)`, `Sync of the branches (#79)`), but **this is what causes branch drift, not what prevents it**: GitHub creates a brand-new, single-parent commit on `main` that `develop` never contains, so the two branches end up with identical file content but incompatible commit graphs — neither is an ancestor of the other. `git pull` can't fix that on its own. If you do keep squash-merging `develop → main` for any reason, you must follow it with the manual resync in the next section every single time.
 
 ## Adding a feature
 
@@ -51,7 +56,7 @@ When `develop` is ready for a release, open a PR `develop → main`:
 gh pr create --base main --head develop --title "Develop"
 ```
 
-Merge it the same way (squash, consistently) so `main` and `develop` don't drift apart in commit-graph shape.
+Merge it on GitHub using **"Create a merge commit"** — not "Squash and merge" — so `main` ends up containing `develop`'s actual commits, not a copy of them.
 
 Afterward, sync both branches locally:
 
@@ -59,6 +64,19 @@ Afterward, sync both branches locally:
 git checkout main    && git pull origin main
 git checkout develop && git pull origin develop
 ```
+
+### If the PR was squash-merged anyway
+
+Squash-merging `develop → main` leaves `develop` pointing at a commit `main` doesn't recognize as an ancestor, even though the content now matches. `git pull` will not resolve this — `develop` needs to be reset to match the new `main` tip:
+
+```bash
+git checkout develop
+git fetch origin                # update the origin/main ref, without merging anything
+git reset --hard origin/main
+git push --force-with-lease origin develop
+```
+
+Only do this once you've confirmed `develop` has nothing in it that isn't already on `main` (`git diff origin/main develop` should be empty) — otherwise you'll discard real work.
 
 ## The one rule that prevents branch drift
 
