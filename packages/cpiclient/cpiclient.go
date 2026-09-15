@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,28 +23,27 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptrace"
+
+	"golang.org/x/oauth2/clientcredentials"
 )
 
 const (
 	apiVersion = "v1"
 )
 
-
-
-
 type CPIClient struct {
 	Username    string
 	Password    string
+	TokenURL    string
 	URL         string
 	Client      *http.Client
 	clientTrace *httptrace.ClientTrace
 	traceCtx    context.Context
-	VerboseLog	bool
+	VerboseLog  bool
 }
 
 type IntegrationPackage struct {
@@ -83,14 +82,15 @@ type IntegrationDesigntimeArtifact struct {
 }
 
 type IntegrationRuntimeArtifact struct {
-	Id              string
-	Version         string
-	Name            string
-	Type 			string
-	DeployedBy		string
-	DeployedOn		string
-	Status			string
+	Id         string
+	Version    string
+	Name       string
+	Type       string
+	DeployedBy string
+	DeployedOn string
+	Status     string
 }
+
 /*
 
 {
@@ -109,11 +109,9 @@ type IntegrationRuntimeArtifact struct {
 	  }
 	}
   }
-  */
+*/
 
-
-
-//Workaround, while JSON response for certain requests is not supported
+// Workaround, while JSON response for certain requests is not supported
 type IntegrationDesigntimeArtifactXMLEntry struct {
 	XMLName    xml.Name                                   `xml:"entry"`
 	Properties IntegrationDesigntimeArtifactXMLProperties `xml:"properties"`
@@ -136,7 +134,7 @@ type Configuration struct {
 	DataType       string
 }
 
-func NewCPIBasicAuthClient(username, password, url string, verbose bool) *CPIClient {
+func NewCPIBasicAuthClient(username, password, tokenURL, url string, verbose bool) *CPIClient {
 	clientTrace := &httptrace.ClientTrace{
 		//GotConn: func(info httptrace.GotConnInfo) { log.Printf("Connection was reused: %t", info.Reused) },
 		//ConnectStart: func(network, addr string) { log.Printf("Connection was started: %s, %s", network, addr) },
@@ -152,20 +150,23 @@ func NewCPIBasicAuthClient(username, password, url string, verbose bool) *CPICli
 	return &CPIClient{
 		Username: username,
 		Password: password,
+		TokenURL: tokenURL,
 		URL:      url,
 		Client: &http.Client{
 			Jar: jar,
 		},
 		clientTrace: clientTrace,
 		traceCtx:    traceCtx,
-		VerboseLog: verbose,
+		VerboseLog:  verbose,
 	}
 }
 
 
 
 func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
-	req.SetBasicAuth(s.Username, s.Password)
+
+	s.setAuth(req)
+
 	if s.VerboseLog {
 		log.Println(req)
 		log.Printf("\n\n")
@@ -179,13 +180,13 @@ func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 	//log.Printf("Status code of HTTP request: %d", resp.StatusCode)
 
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 		log.Fatal(err)
 	}
 	resp.Body.Close()
@@ -203,6 +204,39 @@ func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 		return nil, nil, fmt.Errorf("%s", body)
 	}
 	return body, resp.Header, nil
+}
+
+//type staticTokenSource struct {
+//	token *oauth2.Token
+//}
+
+//func (s *staticTokenSource) Token() (*oauth2.Token, error) {
+//	return s.token, nil
+//}
+
+func (s *CPIClient) setAuth(req *http.Request) error {
+
+	if s.TokenURL == "" {
+		//Basic authentication
+		req.SetBasicAuth(s.Username, s.Password)
+	} else {
+		//oAuth 2.0 authentication
+		config := &clientcredentials.Config{
+			ClientID:     s.Username,
+			ClientSecret: s.Password,
+			TokenURL:     s.TokenURL,
+		}
+
+		// Obtain the access token
+		token, err := config.Token(context.Background())
+		if err != nil {
+			log.Fatalf("Failed to obtain access token: %v", err)
+		}
+
+		req.Header.Set("Authorization", "Bearer "+token.AccessToken)
+	}
+
+	return nil
 }
 
 func (s *CPIClient) getCSRFToken() (string, error) {
@@ -225,7 +259,7 @@ func (s *CPIClient) getCSRFToken() (string, error) {
 
 }
 
-//Configuration
+// Configuration
 func (s *CPIClient) UpdateIntegrationDesigntimeArtifactConfiguration(ArtifactId string, ArtifactVersion string, configuration *Configuration) error {
 	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationDesigntimeArtifacts(Id='" +
 		ArtifactId + "',Version='" + ArtifactVersion + "')/$links/Configurations('" + configuration.ParameterKey + "')")
@@ -296,8 +330,7 @@ func (s *CPIClient) ReadIntegrationDesigntimeArtifactConfigurations(ArtifactId s
 
 }
 
-
-//IntegrationRuntimeArtifacts
+// IntegrationRuntimeArtifacts
 func (s *CPIClient) ReadIntegrationRuntimeArtifact(ArtifactId string) (*IntegrationRuntimeArtifact, error) {
 
 	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationRuntimeArtifacts('" +
@@ -323,16 +356,15 @@ func (s *CPIClient) ReadIntegrationRuntimeArtifact(ArtifactId string) (*Integrat
 	root := data["d"].((map[string]interface{}))
 
 	integrationArtifact := &IntegrationRuntimeArtifact{
-		Id:                root["Id"].(string),
-		Version:		   root["Version"].(string),
-		Name:              root["Name"].(string),
-		Type:			   root["Type"].(string),
-		DeployedBy:		   root["DeployedBy"].(string),
-		DeployedOn:		   root["DeployedOn"].(string),
-		Status:		       root["Status"].(string),
-
+		Id:         root["Id"].(string),
+		Version:    root["Version"].(string),
+		Name:       root["Name"].(string),
+		Type:       root["Type"].(string),
+		DeployedBy: root["DeployedBy"].(string),
+		DeployedOn: root["DeployedOn"].(string),
+		Status:     root["Status"].(string),
 	}
-	
+
 	return integrationArtifact, nil
 
 }
@@ -347,7 +379,7 @@ type IntegrationRuntimeArtifact struct {
 	DeployedOn		string
 	Status			string
 }
-	
+
 
 
 {
@@ -366,10 +398,9 @@ type IntegrationRuntimeArtifact struct {
 	  }
 	}
   }
-  */
+*/
 
-
-//IntegrationDesigntimeArtifacts
+// IntegrationDesigntimeArtifacts
 func (s *CPIClient) ReadIntegrationDesigntimeArtifacts(PackageId string, fetchConfig bool) ([]*IntegrationDesigntimeArtifact, error) {
 	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationPackages('" + PackageId +
 		"')/IntegrationDesigntimeArtifacts" + "?$format=json")
@@ -400,13 +431,13 @@ func (s *CPIClient) ReadIntegrationDesigntimeArtifacts(PackageId string, fetchCo
 	for _, element := range artifactsRawList {
 		artifactJson := element.(map[string]interface{})
 		integrationArtifact = &IntegrationDesigntimeArtifact{
-			Id:              artifactJson["Id"].(string),
-			Version:         artifactJson["Version"].(string),
-			PackageId:       artifactJson["PackageId"].(string),
-			Name:            artifactJson["Name"].(string),
-			Description:     artifactJson["Description"].(string),
-			Sender:          artifactJson["Sender"].(string),
-			Receiver:        artifactJson["Receiver"].(string),
+			Id:          artifactJson["Id"].(string),
+			Version:     artifactJson["Version"].(string),
+			PackageId:   artifactJson["PackageId"].(string),
+			Name:        artifactJson["Name"].(string),
+			Description: artifactJson["Description"].(string),
+			//Sender:          artifactJson["Sender"].(string),
+			//Receiver:        artifactJson["Receiver"].(string),
 			ArtifactContent: "",
 		}
 		if fetchConfig {
@@ -549,7 +580,7 @@ func (s *CPIClient) DeployIntegrationDesigntimeArtifact(ArtifactId string, Artif
 
 }
 
-//Delete artifact
+// Delete artifact
 func (s *CPIClient) DeleteIntegrationDesigntimeArtifact(ArtifactId string, ArtifactVersion string) error {
 
 	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationDesigntimeArtifacts(Id='" +
@@ -577,8 +608,7 @@ func (s *CPIClient) DeleteIntegrationDesigntimeArtifact(ArtifactId string, Artif
 
 }
 
-
-func (s *CPIClient) UndeployIntegrationRuntimeArtifact(ArtifactId string) (error) {
+func (s *CPIClient) UndeployIntegrationRuntimeArtifact(ArtifactId string) error {
 	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationRuntimeArtifacts(Id='" +
 		ArtifactId + "')")
 
@@ -603,7 +633,6 @@ func (s *CPIClient) UndeployIntegrationRuntimeArtifact(ArtifactId string) (error
 	return nil
 
 }
-
 
 /*
 func (s *CPIClient) undeployIntegrationDesigntimeArtifact(ArtifactId string, ArtifactVersion string ) (error) {
@@ -634,7 +663,7 @@ func (s *CPIClient) undeployIntegrationDesigntimeArtifact(ArtifactId string, Art
 }
 */
 
-//IntegrationPackages
+// IntegrationPackages
 func (s *CPIClient) ReadIntegrationPackages() ([]*IntegrationPackage, error) {
 
 	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationPackages" + "?$format=json")
@@ -691,7 +720,7 @@ func (s *CPIClient) ReadIntegrationPackages() ([]*IntegrationPackage, error) {
 	return integrationPackages, nil
 }
 
-//IntegrationPackage by ID
+// IntegrationPackage by ID
 func (s *CPIClient) ReadIntegrationPackage(PackageId string) (*IntegrationPackage, error) {
 
 	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationPackages('" + PackageId + "')?$format=json")
@@ -786,9 +815,8 @@ func (s *CPIClient) CreateIntegrationPackage(integrationPackage *IntegrationPack
 	return nil
 }
 
-
 func (s *CPIClient) CopyIntegrationPackageFromDiscover(DiscoverPackageId string) (*IntegrationPackage, error) {
-	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "CopyIntegrationPackage?" + "$format=json" + "&Id='" +  DiscoverPackageId + "'")
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "CopyIntegrationPackage?" + "$format=json" + "&Id='" + DiscoverPackageId + "'")
 
 	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodPost, url, nil)
 	//req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
@@ -822,25 +850,25 @@ func (s *CPIClient) CopyIntegrationPackageFromDiscover(DiscoverPackageId string)
 	root := data["d"].((map[string]interface{}))
 
 	integrationPackage := &IntegrationPackage{
-		Id:                root["Id"].(string),
-		Name:              root["Name"].(string),
-		Description:       root["Description"].(string),
-		ShortText:         root["ShortText"].(string),
-		Version:           root["Version"].(string),
+		Id:          root["Id"].(string),
+		Name:        root["Name"].(string),
+		Description: root["Description"].(string),
+		ShortText:   root["ShortText"].(string),
+		Version:     root["Version"].(string),
 		/*
-		Vendor:            root["Vendor"].(string),
-		Mode:              root["Mode"].(string),
-		SupportedPlatform: root["SupportedPlatform"].(string),
-		ModifiedBy:        root["ModifiedBy"].(string),
-		CreationDate:      root["CreationDate"].(string),
-		ModifiedDate:      root["ModifiedDate"].(string),
-		CreatedBy:         root["CreatedBy"].(string),
-		Products:          root["Products"].(string),
-		Keywords:          root["Keywords"].(string),
-		Countries:         root["Countries"].(string),
-		Industries:        root["Industries"].(string),
-		LineOfBusiness:    root["LineOfBusiness"].(string),
-		PackageContent:    "", 
+			Vendor:            root["Vendor"].(string),
+			Mode:              root["Mode"].(string),
+			SupportedPlatform: root["SupportedPlatform"].(string),
+			ModifiedBy:        root["ModifiedBy"].(string),
+			CreationDate:      root["CreationDate"].(string),
+			ModifiedDate:      root["ModifiedDate"].(string),
+			CreatedBy:         root["CreatedBy"].(string),
+			Products:          root["Products"].(string),
+			Keywords:          root["Keywords"].(string),
+			Countries:         root["Countries"].(string),
+			Industries:        root["Industries"].(string),
+			LineOfBusiness:    root["LineOfBusiness"].(string),
+			PackageContent:    "",
 		*/
 	}
 
@@ -850,8 +878,8 @@ func (s *CPIClient) CopyIntegrationPackageFromDiscover(DiscoverPackageId string)
 func (s *CPIClient) CheckConnection() error {
 
 	token, err := s.getCSRFToken()
-	
-	if err != nil || token == ""{
+
+	if err != nil || token == "" {
 		log.Printf("System %s check unsuccessful: %s", s.URL, err)
 
 		return err
@@ -860,9 +888,6 @@ func (s *CPIClient) CheckConnection() error {
 
 	return nil
 }
-
-
-
 
 func (artifact *IntegrationDesigntimeArtifact) GetConfiguration(parameter string) (*Configuration, error) {
 

@@ -28,14 +28,18 @@ do
 	fi
     echo 'Completed: '$output_name
 done
-echo 'Compress build...'
-zip -r build/landscaper.zip build
 
-echo 'Clean files...'
-rm build/landscaper-windows-amd64.exe
-rm build/landscaper-darwin-amd64
-rm build/landscaper-darwin-arm64
-rm build/landscaper-linux-amd64
-rm build/landscaper-linux-arm64
+if [ -n "$2" ] && [ $2 = "archive" ]; then
+	echo 'Compress build...'
+	zip -r build/landscaper.zip build
+
+	echo 'Clean files...'
+	rm build/landscaper-windows-amd64.exe
+	rm build/landscaper-darwin-amd64
+	rm build/landscaper-darwin-arm64
+	rm build/landscaper-linux-amd64
+	rm build/landscaper-linux-arm64
+fi
+
 
 echo 'All tasks completed successfully'
