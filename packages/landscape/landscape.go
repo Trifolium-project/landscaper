@@ -214,6 +214,16 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 			return nil, err
 		}
 
+		//Host may be given either literally or as a name of an environment variable
+		host := systemYAML.Host
+		hostFromEnvironment, err := getEnvVariableValue(systemYAML.Host)
+		if err != nil {
+			return nil, err
+		}
+		if hostFromEnvironment != "" {
+			host = hostFromEnvironment
+		}
+
 		reader := bufio.NewReader(os.Stdin)
 
 		if login == "" {
@@ -231,7 +241,7 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 			password = string(bytePassword)
 		}
 
-		system.Client = cpiclient.NewCPIBasicAuthClient(strings.TrimSpace(login), strings.TrimSpace(password), strings.TrimSpace(tokenURL), systemYAML.Host, false)
+		system.Client = cpiclient.NewCPIBasicAuthClient(strings.TrimSpace(login), strings.TrimSpace(password), strings.TrimSpace(tokenURL), strings.TrimSpace(host), false)
 
 		systems[system.Id] = system
 

@@ -380,6 +380,55 @@ Now, only integration flows are supported, but it is also planned to add other o
 
 You need to add artifact information, if it is necessary to maintain different configuration for each environment. For example, you may need to maintain different endpoints to external systems and credential aliases for each environment. Keep in mind, that all configuration parameters, that are not mentioned in landscape.yaml file, value from original environment will be copied. This means, that you can omit all parameters, that are not changing between environments, in landscape.yaml. This will help to keep configuration file clean.
 
+#### **Gathering the landscape definition automatically**
+
+Writing packages, artifacts and their parameters by hand is tedious for a grown tenant. The **init** command does it for you.
+
+Prepare a landscape file with systems, environments and originalEnvironment only - see `conf/landscape-minimal-example.yaml` - and run:
+
+```bash
+landscaper init
+```
+
+Landscaper connects to every system of the landscape, reads its packages, the artifacts of every package and the configuration parameters of every artifact, and writes the `packages` section into `conf/landscape-generated.yaml`. Systems, environments and comments of the source file are kept as they are.
+
+Only the parameters, that differ from the original environment, are written for the other environments, exactly as it is expected of a hand written landscape file. The original environment itself is written completely, as a baseline.
+
+Parameters, that SAP CPI does not allow to change, are left out. By default this is `SAP_ProfileId`, which SAP maintains itself out of the integration profile of the iflow, and which cannot be applied back to a tenant. If an artifact has no other parameters, it is not written at all, so that the file stays readable. Use `--skip-parameters` to change the list.
+
+If several environments are hosted in one system, they are separated by their suffix. Package `SalesforceIntegration` and package `SalesforceIntegrationQA` of the same tenant are recognized as the Dev and the QA copy of one package, and end up in one declaration with a configuration per environment. The same happens across systems, so one package, that lives in a development and in a production tenant, may collect four configurations - for example Dev, QA, PreProd and Prod. A package is only treated as a copy, if the package without suffix exists in the same tenant, so a package, whose name just happens to end with `QA`, is left alone.
+
+Options:
+
+```bash
+#Gather only selected packages. Ids are given without environment suffix
+landscaper init --packages=SalesforceIntegration,CRMIntegrationPackage
+
+#Update the landscape file itself instead of writing a new one
+landscaper init --in-place
+
+#Write another file
+landscaper init --output=conf/landscape-new.yaml
+
+#Write all parameters of every environment, not only the differences
+landscaper init --all-parameters
+
+#Include packages, that are delivered by SAP and cannot be changed
+landscaper init --include-readonly
+
+#Leave out the whole reserved SAP_ namespace, and not only SAP_ProfileId.
+#A trailing asterisk matches a prefix
+landscaper init --skip-parameters=SAP_*
+
+#Leave out own parameters as well
+landscaper init --skip-parameters=SAP_ProfileId,Timeout
+
+#Write all parameters, including the non changeable ones
+landscaper init --skip-parameters=
+```
+
+The `template` attribute of artifacts is not filled, because there is no way to derive it from the tenant. Add it manually after the file is generated.
+
 
 ## How to work with templates in SAP CPI (beta)
 

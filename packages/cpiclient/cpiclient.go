@@ -191,7 +191,7 @@ func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 	}
 	resp.Body.Close()
 	if s.VerboseLog {
-		log.Printf("Response: %s", resp)
+		log.Printf("Response: %v", resp)
 		log.Printf("\n\n")
 	}
 
@@ -320,9 +320,9 @@ func (s *CPIClient) ReadIntegrationDesigntimeArtifactConfigurations(ArtifactId s
 	for _, element := range configurationsRawList {
 		artifactJson := element.(map[string]interface{})
 		configuration = &Configuration{
-			ParameterKey:   artifactJson["ParameterKey"].(string),
-			ParameterValue: artifactJson["ParameterValue"].(string),
-			DataType:       artifactJson["DataType"].(string),
+			ParameterKey:   jsonString(artifactJson, "ParameterKey"),
+			ParameterValue: jsonString(artifactJson, "ParameterValue"),
+			DataType:       jsonString(artifactJson, "DataType"),
 		}
 		configurations = append(configurations, configuration)
 	}
@@ -356,13 +356,13 @@ func (s *CPIClient) ReadIntegrationRuntimeArtifact(ArtifactId string) (*Integrat
 	root := data["d"].((map[string]interface{}))
 
 	integrationArtifact := &IntegrationRuntimeArtifact{
-		Id:         root["Id"].(string),
-		Version:    root["Version"].(string),
-		Name:       root["Name"].(string),
-		Type:       root["Type"].(string),
-		DeployedBy: root["DeployedBy"].(string),
-		DeployedOn: root["DeployedOn"].(string),
-		Status:     root["Status"].(string),
+		Id:         jsonString(root, "Id"),
+		Version:    jsonString(root, "Version"),
+		Name:       jsonString(root, "Name"),
+		Type:       jsonString(root, "Type"),
+		DeployedBy: jsonString(root, "DeployedBy"),
+		DeployedOn: jsonString(root, "DeployedOn"),
+		Status:     jsonString(root, "Status"),
 	}
 
 	return integrationArtifact, nil
@@ -431,11 +431,11 @@ func (s *CPIClient) ReadIntegrationDesigntimeArtifacts(PackageId string, fetchCo
 	for _, element := range artifactsRawList {
 		artifactJson := element.(map[string]interface{})
 		integrationArtifact = &IntegrationDesigntimeArtifact{
-			Id:          artifactJson["Id"].(string),
-			Version:     artifactJson["Version"].(string),
-			PackageId:   artifactJson["PackageId"].(string),
-			Name:        artifactJson["Name"].(string),
-			Description: artifactJson["Description"].(string),
+			Id:          jsonString(artifactJson, "Id"),
+			Version:     jsonString(artifactJson, "Version"),
+			PackageId:   jsonString(artifactJson, "PackageId"),
+			Name:        jsonString(artifactJson, "Name"),
+			Description: jsonString(artifactJson, "Description"),
 			//Sender:          artifactJson["Sender"].(string),
 			//Receiver:        artifactJson["Receiver"].(string),
 			ArtifactContent: "",
@@ -693,28 +693,7 @@ func (s *CPIClient) ReadIntegrationPackages() ([]*IntegrationPackage, error) {
 
 	for _, element := range packageRawList {
 		packageJson := element.(map[string]interface{})
-		integrationPackage = &IntegrationPackage{
-			Id:                packageJson["Id"].(string),
-			Name:              packageJson["Name"].(string),
-			Description:       packageJson["Description"].(string),
-			ShortText:         packageJson["ShortText"].(string),
-			Version:           packageJson["Version"].(string),
-			Vendor:            packageJson["Vendor"].(string),
-			PartnerContent:    packageJson["PartnerContent"].(bool),
-			UpdateAvailable:   packageJson["UpdateAvailable"].(bool),
-			Mode:              packageJson["Mode"].(string),
-			SupportedPlatform: packageJson["SupportedPlatform"].(string),
-			ModifiedBy:        packageJson["ModifiedBy"].(string),
-			CreationDate:      packageJson["CreationDate"].(string),
-			ModifiedDate:      packageJson["ModifiedDate"].(string),
-			CreatedBy:         packageJson["CreatedBy"].(string),
-			Products:          packageJson["Products"].(string),
-			Keywords:          packageJson["Keywords"].(string),
-			Countries:         packageJson["Countries"].(string),
-			Industries:        packageJson["Industries"].(string),
-			LineOfBusiness:    packageJson["LineOfBusiness"].(string),
-			PackageContent:    "",
-		}
+		integrationPackage = parseIntegrationPackage(packageJson)
 		integrationPackages = append(integrationPackages, integrationPackage)
 	}
 	return integrationPackages, nil
@@ -744,28 +723,7 @@ func (s *CPIClient) ReadIntegrationPackage(PackageId string) (*IntegrationPackag
 
 	root := data["d"].((map[string]interface{}))
 
-	integrationPackage := &IntegrationPackage{
-		Id:                root["Id"].(string),
-		Name:              root["Name"].(string),
-		Description:       root["Description"].(string),
-		ShortText:         root["ShortText"].(string),
-		Version:           root["Version"].(string),
-		Vendor:            root["Vendor"].(string),
-		PartnerContent:    root["PartnerContent"].(bool),
-		UpdateAvailable:   root["UpdateAvailable"].(bool),
-		Mode:              root["Mode"].(string),
-		SupportedPlatform: root["SupportedPlatform"].(string),
-		ModifiedBy:        root["ModifiedBy"].(string),
-		CreationDate:      root["CreationDate"].(string),
-		ModifiedDate:      root["ModifiedDate"].(string),
-		CreatedBy:         root["CreatedBy"].(string),
-		Products:          root["Products"].(string),
-		Keywords:          root["Keywords"].(string),
-		Countries:         root["Countries"].(string),
-		Industries:        root["Industries"].(string),
-		LineOfBusiness:    root["LineOfBusiness"].(string),
-		PackageContent:    "",
-	}
+	integrationPackage := parseIntegrationPackage(root)
 
 	return integrationPackage, nil
 }

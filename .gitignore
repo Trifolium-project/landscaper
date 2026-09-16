@@ -2,6 +2,7 @@ bin
 .DS_Store
 .env
 landscape-prod.yaml
+landscape-generated.yaml
 landscaper
 build
 .swp
