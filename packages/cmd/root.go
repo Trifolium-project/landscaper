@@ -26,6 +26,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+//Default landscape file location
+const defaultLandscapeFile = "conf/landscape.yaml"
+
 var cfgFile string
 var landscapeFile *string
 var globalLandscape *landscape.Landscape
@@ -85,8 +88,7 @@ func initConfig() {
 	if *landscapeFile  != "" {
 		landscapeFilePath = *landscapeFile 
 	} else {
-		//Default landscape file location
-		landscapeFilePath = "conf/landscape.yaml"
+		landscapeFilePath = defaultLandscapeFile
 	}
 
 	landscape, err := landscape.NewLandscape(landscapeFilePath)
