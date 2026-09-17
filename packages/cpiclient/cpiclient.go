@@ -551,6 +551,42 @@ func (s *CPIClient) UploadIntegrationDesigntimeArtifact(integrationArtifact *Int
 	return nil
 }
 
+//Update the content of an artifact that already exists in the tenant.
+//The new version is taken from Bundle-Version in the uploaded archive, so the
+//request always addresses the Active version. Unlike a delete and recreate,
+//this keeps the artifact history and its existing configuration.
+func (s *CPIClient) UpdateIntegrationDesigntimeArtifact(integrationArtifact *IntegrationDesigntimeArtifact) error {
+
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationDesigntimeArtifacts(Id='" +
+		integrationArtifact.Id + "',Version='Active')")
+
+	body, err := json.Marshal(integrationArtifact)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodPut, url, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	token, err := s.getCSRFToken()
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("X-CSRF-Token", token)
+	req.Header.Set("Content-Type", "application/json")
+
+	_, _, err = s.doRequest(req)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 //IntegrationDesigntimeArtifact
 
 func (s *CPIClient) DeployIntegrationDesigntimeArtifact(ArtifactId string, ArtifactVersion string) error {
