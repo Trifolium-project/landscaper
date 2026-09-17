@@ -58,11 +58,26 @@ gh pr create --base main --head develop --title "Develop"
 
 Merge it on GitHub using **"Create a merge commit"** — not "Squash and merge" — so `main` ends up containing `develop`'s actual commits, not a copy of them.
 
-Afterward, sync both branches locally:
+Afterward, sync both branches locally. Use `--ff-only` rather than a plain `pull`: it makes git refuse and error out if a fast-forward isn't actually possible, instead of silently creating an unexpected merge commit.
 
 ```bash
-git checkout main    && git pull origin main
-git checkout develop && git pull origin develop
+git checkout main    && git pull --ff-only origin main
+git checkout develop && git pull --ff-only origin develop
+git pull --ff-only origin main      # bring the merge commit into develop too
+git push origin develop             # publish that catch-up
+```
+
+If `--ff-only` ever fails here, stop — it means `develop` and `main` have actually diverged (e.g. someone squash-merged instead of using a merge commit), and you need the recovery steps below instead of forcing a merge.
+
+### Do I need to run this after every merge to main?
+
+No. Since `develop → main` uses a real merge commit, `develop` staying "behind" `main` by an unfetched merge commit is harmless and always safe to fast-forward through later — it's not drift. You can let a few releases pile up without syncing.
+
+The one time it actually matters: **run it before branching off `develop` for new feature work**, so the feature doesn't miss anything that landed on `main` outside of `develop` (a hotfix, for example). Sanity-check first if you're unsure whether it's safe:
+
+```bash
+git fetch origin
+git merge-base --is-ancestor origin/develop origin/main && echo "safe to fast-forward" || echo "diverged - do not pull, see recovery steps"
 ```
 
 ### If the PR was squash-merged anyway
@@ -80,4 +95,12 @@ Only do this once you've confirmed `develop` has nothing in it that isn't alread
 
 ## The one rule that prevents branch drift
 
-Always `git pull origin develop` immediately before branching off it for new work. Letting a local branch sit unpulled while `origin/develop` moves on is exactly how a local branch can silently fall many commits behind, leading to real merge conflicts and rejected (non-fast-forward) pushes when you finally try to reconcile it.
+Always pull immediately before branching off `develop` for new work — both from `develop` itself and from `main`, in case a release merge landed there since you last synced:
+
+```bash
+git checkout develop
+git pull --ff-only origin develop
+git pull --ff-only origin main
+```
+
+Letting a local branch sit unpulled while `origin/develop` moves on is exactly how a local branch can silently fall many commits behind, leading to real merge conflicts and rejected (non-fast-forward) pushes when you finally try to reconcile it.

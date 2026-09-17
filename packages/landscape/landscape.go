@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"syscall"
 
@@ -143,6 +144,31 @@ func (landscape *Landscape) GetEnvironment(environment string) (*Environment, er
 	return env, nil
 }
 
+// Find the package that declares the given artifact. The artifact id must be
+// the base one, without any environment suffix. Used by "artifact upload" to
+// resolve the target package of a folder in the local repository.
+func (landscape *Landscape) FindPackageForArtifact(artifact string) (string, error) {
+
+	var matches []string
+
+	for _, pkg := range landscape.Packages {
+		if _, found := pkg.Artifacts[artifact]; found {
+			matches = append(matches, pkg.Id)
+		}
+	}
+
+	sort.Strings(matches)
+
+	switch len(matches) {
+	case 0:
+		return "", fmt.Errorf("Artifact %s is not declared in any package of the landscape configuration, use --pkg to set the target package explicitly", artifact)
+	case 1:
+		return matches[0], nil
+	default:
+		return "", fmt.Errorf("Artifact %s is declared in several packages (%s), use --pkg to select one", artifact, strings.Join(matches, ", "))
+	}
+}
+
 // Get list of artifacts, that are based on selected template
 func (landscape *Landscape) GetArtifactsByTemplate(template string) []*Artifact {
 	var artifactList []*Artifact
@@ -214,6 +240,16 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 			return nil, err
 		}
 
+		//Host may be given either literally or as a name of an environment variable
+		host := systemYAML.Host
+		hostFromEnvironment, err := getEnvVariableValue(systemYAML.Host)
+		if err != nil {
+			return nil, err
+		}
+		if hostFromEnvironment != "" {
+			host = hostFromEnvironment
+		}
+
 		reader := bufio.NewReader(os.Stdin)
 
 		if login == "" {
@@ -231,7 +267,7 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 			password = string(bytePassword)
 		}
 
-		system.Client = cpiclient.NewCPIBasicAuthClient(strings.TrimSpace(login), strings.TrimSpace(password), strings.TrimSpace(tokenURL), systemYAML.Host, false)
+		system.Client = cpiclient.NewCPIBasicAuthClient(strings.TrimSpace(login), strings.TrimSpace(password), strings.TrimSpace(tokenURL), strings.TrimSpace(host), false)
 
 		systems[system.Id] = system
 

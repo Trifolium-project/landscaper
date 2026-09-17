@@ -380,6 +380,203 @@ Now, only integration flows are supported, but it is also planned to add other o
 
 You need to add artifact information, if it is necessary to maintain different configuration for each environment. For example, you may need to maintain different endpoints to external systems and credential aliases for each environment. Keep in mind, that all configuration parameters, that are not mentioned in landscape.yaml file, value from original environment will be copied. This means, that you can omit all parameters, that are not changing between environments, in landscape.yaml. This will help to keep configuration file clean.
 
+#### **Gathering the landscape definition automatically**
+
+Writing packages, artifacts and their parameters by hand is tedious for a grown tenant. The **init** command does it for you.
+
+Prepare a landscape file with systems, environments and originalEnvironment only - see `conf/landscape-minimal-example.yaml` - and run:
+
+```bash
+landscaper init
+```
+
+Landscaper connects to every system of the landscape, reads its packages, the artifacts of every package and the configuration parameters of every artifact, and writes the `packages` section into `conf/landscape-generated.yaml`. Systems, environments and comments of the source file are kept as they are.
+
+Only the parameters, that differ from the original environment, are written for the other environments, exactly as it is expected of a hand written landscape file. The original environment itself is written completely, as a baseline.
+
+Parameters, that SAP CPI does not allow to change, are left out. By default this is `SAP_ProfileId`, which SAP maintains itself out of the integration profile of the iflow, and which cannot be applied back to a tenant. If an artifact has no other parameters, it is not written at all, so that the file stays readable. Use `--skip-parameters` to change the list.
+
+If several environments are hosted in one system, they are separated by their suffix. Package `SalesforceIntegration` and package `SalesforceIntegrationQA` of the same tenant are recognized as the Dev and the QA copy of one package, and end up in one declaration with a configuration per environment. The same happens across systems, so one package, that lives in a development and in a production tenant, may collect four configurations - for example Dev, QA, PreProd and Prod. A package is only treated as a copy, if the package without suffix exists in the same tenant, so a package, whose name just happens to end with `QA`, is left alone.
+
+Options:
+
+```bash
+#Gather only selected packages. Ids are given without environment suffix
+landscaper init --packages=SalesforceIntegration,CRMIntegrationPackage
+
+#Update the landscape file itself instead of writing a new one
+landscaper init --in-place
+
+#Write another file
+landscaper init --output=conf/landscape-new.yaml
+
+#Write all parameters of every environment, not only the differences
+landscaper init --all-parameters
+
+#Include packages, that are delivered by SAP and cannot be changed
+landscaper init --include-readonly
+
+#Leave out the whole reserved SAP_ namespace, and not only SAP_ProfileId.
+#A trailing asterisk matches a prefix
+landscaper init --skip-parameters=SAP_*
+
+#Leave out own parameters as well
+landscaper init --skip-parameters=SAP_ProfileId,Timeout
+
+#Write all parameters, including the non changeable ones
+landscaper init --skip-parameters=
+```
+
+The `template` attribute of artifacts is not filled, because there is no way to derive it from the tenant. Add it manually after the file is generated.
+
+
+## How to deploy from a git repository to a tenant
+
+The commands above move content from one tenant to another. **pack** and **upload** go the other way round - they take an integration flow out of the local git repository and put it into a tenant. This is what a merge request pipeline needs.
+
+An integration flow is stored in the repository as an exploded folder, exactly as SAP Cloud Integration exports it:
+
+```
+artifacts/Order_API_TEST_HARNESS
+├── .project
+├── metainfo.prop
+├── META-INF
+│   └── MANIFEST.MF
+└── src/main/resources
+    ├── parameters.prop
+    ├── parameters.propdef
+    ├── mapping/map.mmap
+    ├── script/script1.groovy
+    ├── xsd/order.xsd
+    └── scenarioflows/integrationflow/Sample API.iflw
+```
+
+### Packing an artifact
+
+```bash
+landscaper artifact pack artifacts/Order_API_TEST_HARNESS
+```
+
+The archive is named after the folder and holds every file inside it, with `META-INF/MANIFEST.MF` at the archive root. It is written to `build/` unless `--output` says otherwise.
+
+The version of an artifact is the `Bundle-Version` of its `META-INF/MANIFEST.MF`. SAP Cloud Integration refuses content, whose version is already in the tenant, so before packing, landscaper reads the version of the same artifact in the original environment and compares it with the local one:
+
+ - the local version is higher - the artifact is packed right away
+ - the artifact is not in the tenant yet - the artifact is packed right away
+ - the local version is equal or lower - a new version is requested, written into `META-INF/MANIFEST.MF` and only then packed
+
+```bash
+landscaper artifact pack artifacts/Order_API_TEST_HARNESS
+```
+
+```bash
+Artifact Order_API_TEST_HARNESS is at version 1.0.3 in environment Dev, the local version is 1.0.3.
+Please enter a new version [1.0.4]:
+#	ArtefactId		Version in Dev	Local Version	Packed Version	Changed	Archive
+1	Order_API_TEST_HARNESS	1.0.3		1.0.3		1.0.4		true	build/Order_API_TEST_HARNESS.zip
+```
+
+The new version stays in the working tree, so it can be committed together with the change itself. Only the `Bundle-Version` line of the manifest is touched, the rest of the file is kept byte for byte.
+
+Several artifacts can be packed at once, and the check can be skipped:
+
+```bash
+landscaper artifact pack artifacts/Order_API_TEST_HARNESS artifacts/Sample_API
+
+#Do not look into the tenant at all
+landscaper artifact pack artifacts/Order_API_TEST_HARNESS --skip-version-check
+
+#Write the archives somewhere else
+landscaper artifact pack artifacts/Order_API_TEST_HARNESS --output=target
+```
+
+A pipeline has no terminal to ask, so the version can be given in advance. Without one of these three flags the command stops with an error instead of waiting for an answer nobody will type:
+
+```bash
+#Raise the version above the one in the tenant automatically
+landscaper artifact pack artifacts/Order_API_TEST_HARNESS --bump=patch
+landscaper artifact pack artifacts/Order_API_TEST_HARNESS --bump=minor
+landscaper artifact pack artifacts/Order_API_TEST_HARNESS --bump=major
+
+#Set an exact version. It has to be higher than the one in the tenant
+landscaper artifact pack artifacts/Order_API_TEST_HARNESS --set-version=2.0.0
+```
+
+The version is always raised relative to the **tenant**, not to the local copy, so `--bump=patch` against a tenant at `1.0.3` gives `1.0.4` regardless of how far the repository has fallen behind.
+
+All of the above describes packing for the **original environment**, which is the one that owns the version. With `--target-env` the artifact is packed for another environment instead:
+
+```bash
+landscaper artifact pack artifacts/Order_API_TEST_HARNESS --target-env=QA
+```
+
+```bash
+#	ArtefactId			Version in QA	Local Version	Packed Version	Changed	Archive
+1	Order_API_TEST_HARNESSQA	1.0.4		1.0.5		1.0.5		false	build/Order_API_TEST_HARNESSQA.zip
+```
+
+Then the version is taken from the repository exactly as it is, `META-INF/MANIFEST.MF` is never written, and `--bump` and `--set-version` are ignored with a warning. If the version is not higher than the one already in that environment, a warning is printed and the artifact is packed anyway.
+
+`Bundle-SymbolicName` and `Bundle-Name` receive the environment suffix **inside the archive**, and the archive is named after the suffixed id:
+
+```bash
+unzip -p build/Order_API_TEST_HARNESSQA.zip META-INF/MANIFEST.MF | grep Bundle-
+```
+
+```bash
+Bundle-Name: Order API for Test Harness QA
+Bundle-SymbolicName: Order_API_TEST_HARNESSQA; singleton:=true
+Bundle-Version: 1.0.5
+```
+
+This is required, not cosmetic. SAP Cloud Integration derives the symbolic name of an artifact from the id it was created under, so an archive uploaded as `Order_API_TEST_HARNESSQA` that still says `Order_API_TEST_HARNESS` inside is rejected on the next update with *"Could not update artifact of the package; due to change in the Bundle-symbolicName"*. The rename happens in the archive only - the repository is never modified, and `Origin-Bundle-Name` and `Origin-Bundle-SymbolicName` keep the original values.
+
+### Uploading an artifact
+
+```bash
+landscaper artifact upload artifacts/Order_API_TEST_HARNESS --target-env=QA --deploy
+```
+
+```bash
+Uploading 1 artifact(s) to QA...
+#	ArtefactId			Source	Package				Version in QA	Uploaded Version	Action	Deployed
+1	Order_API_TEST_HARNESSQA	folder	TestHarnessPreparationQA	1.0.3		1.0.4			updated	true
+```
+
+An argument is either a folder, which is packed first with the logic described above, or a ready zip archive. Both can be mixed in one call:
+
+```bash
+landscaper artifact upload artifacts/Order_API_TEST_HARNESS build/Sample_API.zip --target-env=QA
+```
+
+The target package is taken from the landscape definition - the package, that declares the artifact - and, together with the artifact id and name, receives the suffix of the target environment, exactly as **package move** does it. Upload to `QA` therefore puts `Order_API_TEST_HARNESSQA` into `TestHarnessPreparationQA`. The package is created, if it is not in the tenant yet. Use `--pkg` to name the target package explicitly, if an artifact is not declared in the landscape file.
+
+After the upload the configuration parameters, that the landscape definition declares for the target environment, are applied to the artifact. An artifact, that already exists, is updated in place, so its history and its configuration are kept - it is not deleted and created again.
+
+Whenever the target environment has a suffix, the identifiers inside the archive are suffixed too, exactly as described for `artifact pack --target-env` above. A ready `.zip` given on the command line is rewritten the same way before it is sent, so it does not matter whether it was packed for another environment.
+
+**Who owns the version** depends on where the content goes:
+
+ - **the original environment** - the repository owns it. The version is checked against the tenant, `--bump` and `--set-version` apply, and a raised version is written back into `META-INF/MANIFEST.MF` so it can be committed
+ - **any other environment** - the repository states it. The version is uploaded exactly as it stands in `META-INF/MANIFEST.MF`, nothing is ever written back, and `--bump` and `--set-version` are ignored with a warning. If the version is not higher than the one already in the target, a warning goes to stdout and the upload proceeds
+
+This is what makes the command safe in a merge request pipeline: a deployment to `QA` can never modify the working tree, so it cannot produce a commit the pipeline did not intend.
+
+```bash
+#Upload without looking at the versions in the tenant at all
+landscaper artifact upload artifacts/Order_API_TEST_HARNESS --target-env=QA --skip-version-check
+
+#Deploy to QA, as a pipeline would do it. The version comes from the repository
+landscaper artifact upload artifacts/Order_API_TEST_HARNESS --target-env=QA --deploy
+
+#Raise the version in the repository and deploy to the original environment
+landscaper artifact upload artifacts/Order_API_TEST_HARNESS --target-env=Dev --bump=patch --deploy
+```
+
+Both commands exit with a non zero code on the first failure, and report what has already been done, so a pipeline stops on the first broken artifact.
+
+Note, that `--env` is not needed for an upload. It selects the *source* environment and landscaper appends its suffix to `--pkg`, so passing both `--env` and `--target-env` would suffix the package twice.
+
 
 ## How to work with templates in SAP CPI (beta)
 

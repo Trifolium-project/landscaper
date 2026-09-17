@@ -2,8 +2,10 @@ bin
 .DS_Store
 .env
 landscape-prod.yaml
+landscape-generated.yaml
 landscaper
 build
 .swp
 .vscode
 conf/landscape.yaml
+artifacts
