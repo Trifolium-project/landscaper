@@ -8,3 +8,4 @@ build
 .swp
 .vscode
 conf/landscape.yaml
+artifacts
