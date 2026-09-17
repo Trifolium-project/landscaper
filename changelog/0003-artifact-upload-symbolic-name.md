@@ -149,7 +149,7 @@ produces `build/Order_API_TEST_HARNESS.zip` with the base names.
 
 ## Findings from the live test run
 
-Running `TESTING.md` end to end against a tenant confirmed the fix - the `PUT`
+Running the scenarios in `testing/` end to end against a tenant confirmed the fix - the `PUT`
 that previously returned *"due to change in the Bundle-symbolicName"* now
 succeeds - and surfaced two further defects, both introduced by this change and
 both fixed here.

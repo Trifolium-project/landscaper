@@ -56,7 +56,7 @@ handling - manifests, versions, zip - with no cobra and no HTTP.
 | `conf/landscape*.yaml` | Landscape definitions. `landscape.yaml` is gitignored |
 | `assets/IntegrationContent.yaml` | SAP's OData swagger. **159KB - grep it, never read it whole** |
 | `changelog/000N-*.md` | Design + implementation doc per feature. Write one for each feature |
-| `TESTING.md` | Manual test plan for `artifact pack` / `artifact upload` |
+| `testing/` | Executable test scenarios, `run-all.sh` is the entry point. See `testing/README.md` |
 
 ### Stub commands
 
@@ -105,4 +105,12 @@ go test ./packages/...
 - `packages/cmd`: drives `packArtifact` / `uploadArtifact` against an in-process `httptest.NewTLSServer`. The client builds its own `http.Client`, so the test cert is trusted by swapping `TLSClientConfig` on `http.DefaultTransport` and restoring it after. See `artifactUpload_test.go` before writing a new command test.
 - `packages/cpiclient` has no tests.
 
-Live-tenant verification is manual; `TESTING.md` is the worked example.
+Scenario tests live in `testing/` as asserting bash scripts:
+
+```bash
+./testing/run-all.sh                  # local only
+./testing/run-all.sh --with-tenant    # includes the scripts that write to a tenant
+```
+
+Tenant scripts refuse to run without `LANDSCAPER_TEST_TENANT=1`. `testing/README.md`
+explains the layout; `testing/MANUAL-TEST-PLAN.md` is the narrative walkthrough.
