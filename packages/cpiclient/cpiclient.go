@@ -452,27 +452,40 @@ func (s *CPIClient) ReadIntegrationDesigntimeArtifacts(PackageId string, fetchCo
 
 }
 
+//DownloadIntegrationDesigntimeArtifactContent returns the raw zip archive of an
+//artifact. ArtifactVersion is either a concrete version or "Active" for the
+//current designtime content.
+func (s *CPIClient) DownloadIntegrationDesigntimeArtifactContent(ArtifactId string, ArtifactVersion string) ([]byte, error) {
+
+	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationDesigntimeArtifacts(Id='" +
+		ArtifactId + "',Version='" + ArtifactVersion + "')/$value")
+
+	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	content, _, err := s.doRequest(req)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to download artifact %s version %s: %s", ArtifactId, ArtifactVersion, err)
+	}
+
+	return content, nil
+}
+
 func (s *CPIClient) DownloadIntegrationDesigntimeArtifact(ArtifactId string, ArtifactVersion string) (*IntegrationDesigntimeArtifact, error) {
 
 	integrationArtifact, err := s.ReadIntegrationDesigntimeArtifact(ArtifactId, ArtifactVersion)
 	if err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("https://" + s.URL + "/api/" + apiVersion + "/" + "IntegrationDesigntimeArtifacts(Id='" +
-		ArtifactId + "',Version='" + ArtifactVersion + "')/$value")
 
-	req, err := http.NewRequestWithContext(s.traceCtx, http.MethodGet, url, nil)
-	//req, err := http.NewRequest("GET", url, nil)
+	content, err := s.DownloadIntegrationDesigntimeArtifactContent(ArtifactId, ArtifactVersion)
 	if err != nil {
 		return nil, err
 	}
-	bytes, _, err := s.doRequest(req)
-	if err != nil {
-		return nil, err
-	}
-	//TODO: Perform check for unsuccessful download, and return error
 
-	integrationArtifact.ArtifactContent = base64.StdEncoding.EncodeToString(bytes)
+	integrationArtifact.ArtifactContent = base64.StdEncoding.EncodeToString(content)
 
 	return integrationArtifact, nil
 

@@ -40,6 +40,7 @@ handling - manifests, versions, zip - with no cobra and no HTTP.
 | `packages/cmd/packageCopy.go`, `packageList.go` | Copy from Discover, list packages |
 | `packages/cmd/artifactPack.go` | `artifact pack` + `packArtifact`, shared with upload |
 | `packages/cmd/artifactUpload.go` | `artifact upload` - git repo -> tenant |
+| `packages/cmd/artifactDownload.go` | `artifact download` - tenant -> git repo, the only direction that extracts |
 | `packages/cmd/artifactUpgrade.go` | Template-based upgrade within one tenant (beta) |
 | `packages/cmd/artifactList.go`, `artifactGet.go`, `artifactDelpoy.go`, `artifactUndelpoy.go` | Read and runtime operations (note the `Delpoy` typos in the filenames) |
 | `packages/cmd/landscapeInit.go` | `init` - generate the `packages:` section from a tenant |
@@ -51,7 +52,7 @@ handling - manifests, versions, zip - with no cobra and no HTTP.
 | `packages/landscape/export.go` | Write `packages:` back into YAML preserving comments |
 | `packages/iflow/manifest.go` | Read/write `META-INF/MANIFEST.MF` |
 | `packages/iflow/version.go` | `Version`, `ParseVersion`, `Compare`, `Bump` |
-| `packages/iflow/zip.go` | `ZipDir`, `WriteFileAtomic`, read headers out of an archive |
+| `packages/iflow/zip.go` | `ZipDir`, `UnzipToDir`, `WriteFileAtomic`, read headers out of an archive |
 | `packages/util/util.go` | `Contains` |
 | `conf/landscape*.yaml` | Landscape definitions. `landscape.yaml` is gitignored |
 | `assets/IntegrationContent.yaml` | SAP's OData swagger. **159KB - grep it, never read it whole** |
@@ -86,6 +87,7 @@ Things that are expensive to rediscover. Read these before changing anything.
 
 - **`root.go:115` and `root.go:120` mutate the global flags before any command runs**: `*pkg = *pkg + env.Suffix` and `*artifact = *artifact + env.Suffix`, using the suffix of `--env`. Consequences: never route a filesystem path through `--artifact`; never combine `--env` with `--target-env` or the package is suffixed twice; a new command taking paths must use positional args.
 - **The archive's `Bundle-SymbolicName` must match the OData `Id` it is uploaded under.** The tenant derives the symbolic name from the id at creation and rejects any later `PUT` whose archive disagrees ("due to change in the Bundle-symbolicName"). `artifact pack`/`upload` therefore suffix `Bundle-SymbolicName` and `Bundle-Name` **inside the archive** whenever `Environment.Suffix != ""` - never in the repository. See `changelog/0003-artifact-upload-symbolic-name.md`.
+- **`artifact download` is not the mirror of `artifact upload`.** It writes tenant ids **verbatim**, so downloading from a suffixed environment yields `artifacts/MyPackageQA/MyFlowQA/` with `Bundle-SymbolicName: MyFlowQA` left as it is. Such a folder uploads back to `QA` (via `trimTargetSuffix`) but **not** to `Dev`, and `artifact pack` needs `--skip-version-check`. See `changelog/0004-artifact-download.md`.
 - **Only the original environment owns the version.** Uploading anywhere else takes the version from `META-INF/MANIFEST.MF` as it is, never writes the working tree, and ignores `--bump`/`--set-version`. A pipeline deploying to QA can therefore not produce a commit.
 - **`Version == "Active"`** in an API response means the artifact is a **draft** in the tenant, not a version string. `packageMove` aborts on it; `artifact pack` cannot compare it.
 - **`assets/IntegrationContent.yaml` is 159KB** (~40K tokens). Grep it for the endpoint you need.
