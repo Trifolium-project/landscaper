@@ -97,6 +97,75 @@ func TestClassifyPackages(t *testing.T) {
 	}
 }
 
+func TestSelectPackagesForEnvironment(t *testing.T) {
+
+	dev := &System{Id: "dev"}
+
+	devEnvironment := environment("Dev", "", dev)
+	qaEnvironment := environment("QA", "QA", dev)
+	stagingEnvironment := environment("Staging", "", dev)
+
+	packageIds := []string{"Foo", "FooQA", "Bar", "SAPDelivered"}
+	packageModes := map[string]string{"SAPDelivered": readOnlyPackageMode}
+
+	tests := []struct {
+		name            string
+		environments    []*Environment
+		baseEnvironment *Environment
+		environment     *Environment
+		expected        string
+		expectWarning   bool
+	}{
+		{
+			name:            "Suffixed environment gets only the suffixed packages",
+			environments:    []*Environment{devEnvironment, qaEnvironment},
+			baseEnvironment: devEnvironment,
+			environment:     qaEnvironment,
+			expected:        "FooQA",
+		},
+		{
+			name:            "Base environment gets the packages without suffix",
+			environments:    []*Environment{devEnvironment, qaEnvironment},
+			baseEnvironment: devEnvironment,
+			environment:     devEnvironment,
+			expected:        "Bar Foo",
+			expectWarning:   true, //SAPDelivered is read only
+		},
+		{
+			name:            "Packages delivered by SAP are skipped",
+			environments:    []*Environment{devEnvironment},
+			baseEnvironment: devEnvironment,
+			environment:     devEnvironment,
+			//FooQA has no environment with suffix QA here, so it is a base package of its own
+			expected:      "Bar Foo FooQA",
+			expectWarning: true,
+		},
+		{
+			name:            "Environment without suffix, that is not the base one, gets nothing",
+			environments:    []*Environment{devEnvironment, stagingEnvironment, qaEnvironment},
+			baseEnvironment: devEnvironment,
+			environment:     stagingEnvironment,
+			expected:        "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			packages, warnings := selectPackagesForEnvironment(packageIds, packageModes,
+				test.environments, test.baseEnvironment, test.environment)
+
+			actual := strings.Join(packages, " ")
+			if actual != test.expected {
+				t.Errorf("expected packages %q, got %q", test.expected, actual)
+			}
+
+			if test.expectWarning && len(warnings) == 0 {
+				t.Errorf("expected a warning, got none")
+			}
+		})
+	}
+}
+
 //Two tenants, each one hosting an environment without suffix and a suffixed one.
 //One package has to end up with four bindings under one base id.
 func TestClassifyPackagesTwoSystems(t *testing.T) {
