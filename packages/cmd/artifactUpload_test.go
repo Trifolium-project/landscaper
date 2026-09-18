@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -43,15 +44,28 @@ type stubTenant struct {
 	Artifacts map[string]string
 	//Packages that exist in the tenant
 	Packages map[string]bool
-	Calls    []tenantCall
+	//Artifact id to the package holding it. Empty means every artifact belongs
+	//to whatever package is asked for, which is what the upload tests expect
+	ArtifactPackages map[string]string
+	//Artifact id to the archive the download call answers with
+	ArtifactZips map[string][]byte
+	//Package id to its Mode, for example READ_ONLY
+	PackageModes map[string]string
+	//Artifact ids, whose download fails
+	FailingDownloads map[string]bool
+	Calls            []tenantCall
 }
 
 func newStubTenant(t *testing.T) *stubTenant {
 	t.Helper()
 
 	tenant := &stubTenant{
-		Artifacts: map[string]string{},
-		Packages:  map[string]bool{},
+		Artifacts:        map[string]string{},
+		Packages:         map[string]bool{},
+		ArtifactPackages: map[string]string{},
+		ArtifactZips:     map[string][]byte{},
+		PackageModes:     map[string]string{},
+		FailingDownloads: map[string]bool{},
 	}
 
 	tenant.Server = httptest.NewTLSServer(http.HandlerFunc(tenant.handle))
@@ -100,6 +114,20 @@ func (tenant *stubTenant) handle(writer http.ResponseWriter, request *http.Reque
 	path := request.URL.Path
 
 	switch {
+	case request.Method == http.MethodGet && strings.HasSuffix(path, "/$value"):
+		artifactId := quotedIdFromPath(path, "IntegrationDesigntimeArtifacts(Id=")
+		if tenant.FailingDownloads[artifactId] {
+			http.Error(writer, `{"error":"artifact cannot be downloaded"}`, http.StatusInternalServerError)
+			return
+		}
+		content, found := tenant.ArtifactZips[artifactId]
+		if !found {
+			http.Error(writer, `{"error":"artifact not found"}`, http.StatusNotFound)
+			return
+		}
+		writer.Header().Set("Content-Type", "application/zip")
+		writer.Write(content)
+
 	case request.Method == http.MethodGet && strings.HasSuffix(path, "/IntegrationDesigntimeArtifacts"):
 		packageId := packageIdFromPath(path)
 		if !tenant.Packages[packageId] {
@@ -109,10 +137,34 @@ func (tenant *stubTenant) handle(writer http.ResponseWriter, request *http.Reque
 
 		results := []map[string]string{}
 		for id, version := range tenant.Artifacts {
+			//An empty ownership map keeps the behaviour the upload tests rely on
+			if owner, declared := tenant.ArtifactPackages[id]; len(tenant.ArtifactPackages) > 0 && (!declared || owner != packageId) {
+				continue
+			}
 			results = append(results, map[string]string{
 				"Id": id, "Version": version, "PackageId": packageId,
 				"Name": id, "Description": "", "Sender": "", "Receiver": "",
 			})
+		}
+		json.NewEncoder(writer).Encode(map[string]interface{}{
+			"d": map[string]interface{}{"results": results},
+		})
+
+	case request.Method == http.MethodGet && strings.HasSuffix(path, "/IntegrationPackages"):
+		packageIds := []string{}
+		for id := range tenant.Packages {
+			packageIds = append(packageIds, id)
+		}
+		sort.Strings(packageIds)
+
+		results := []map[string]interface{}{}
+		//The client pages with $top and $skip, one short page ends the loop
+		if request.URL.Query().Get("$skip") == "" || request.URL.Query().Get("$skip") == "0" {
+			for _, id := range packageIds {
+				results = append(results, map[string]interface{}{
+					"Id": id, "Name": id, "Version": "1.0.0", "Mode": tenant.PackageModes[id],
+				})
+			}
 		}
 		json.NewEncoder(writer).Encode(map[string]interface{}{
 			"d": map[string]interface{}{"results": results},

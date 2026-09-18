@@ -356,3 +356,222 @@ func TestRewriteZipManifestWithoutManifest(t *testing.T) {
 		t.Fatal("expected an error for an archive without a manifest")
 	}
 }
+
+//zipWithEntries builds an archive of the given names verbatim, so that entries,
+//that ZipDir would never produce, can be tested
+func zipWithEntries(t *testing.T, entries map[string]string) []byte {
+	t.Helper()
+
+	names := []string{}
+	for name := range entries {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	buffer := &bytes.Buffer{}
+	archive := zip.NewWriter(buffer)
+
+	for _, name := range names {
+		writer, err := archive.CreateHeader(&zip.FileHeader{Name: name, Method: zip.Deflate, Modified: zipEpoch})
+		if err != nil {
+			t.Fatalf("unable to add %s: %v", name, err)
+		}
+		if _, err := writer.Write([]byte(entries[name])); err != nil {
+			t.Fatalf("unable to write %s: %v", name, err)
+		}
+	}
+
+	if err := archive.Close(); err != nil {
+		t.Fatalf("unable to close archive: %v", err)
+	}
+
+	return buffer.Bytes()
+}
+
+func TestUnzipToDirRoundTripsZipDir(t *testing.T) {
+	root := writeIflowProject(t)
+
+	data, err := ZipDir(root)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	destination := filepath.Join(t.TempDir(), "Order_API_TEST_HARNESS")
+	if err := UnzipToDir(data, destination); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !IsArtifactDir(destination) {
+		t.Fatalf("%s is not an integration flow folder after extraction", destination)
+	}
+
+	version, err := ReadBundleVersion(destination)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if version != "1.0.3" {
+		t.Errorf("Bundle-Version = %q, want %q", version, "1.0.3")
+	}
+
+	//Every entry of the archive has to be on disk with the same content
+	for _, name := range archiveNames(t, data) {
+		got, err := os.ReadFile(filepath.Join(destination, filepath.FromSlash(name)))
+		if err != nil {
+			t.Fatalf("unable to read extracted %s: %v", name, err)
+		}
+		want, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
+		if err != nil {
+			t.Fatalf("unable to read source of %s: %v", name, err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Errorf("%s content differs after extraction", name)
+		}
+	}
+}
+
+//os.MkdirTemp creates the staging folder with 0700, so without an explicit
+//chmod the downloaded artifact ends up less readable than everything else
+func TestUnzipToDirCreatesReadableFolders(t *testing.T) {
+	root := writeIflowProject(t)
+
+	data, err := ZipDir(root)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	destination := filepath.Join(t.TempDir(), "artifact")
+	if err := UnzipToDir(data, destination); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	info, err := os.Stat(destination)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.Mode().Perm() != 0755 {
+		t.Errorf("folder mode = %v, want %v", info.Mode().Perm(), os.FileMode(0755))
+	}
+
+	file, err := os.Stat(filepath.Join(destination, "META-INF", "MANIFEST.MF"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if file.Mode().Perm() != 0644 {
+		t.Errorf("file mode = %v, want %v", file.Mode().Perm(), os.FileMode(0644))
+	}
+}
+
+func TestUnzipToDirReplacesExistingFolder(t *testing.T) {
+	root := writeIflowProject(t)
+
+	data, err := ZipDir(root)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	destination := filepath.Join(t.TempDir(), "artifact")
+	stale := filepath.Join(destination, "stale.txt")
+	if err := os.MkdirAll(destination, 0755); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := os.WriteFile(stale, []byte("old"), 0644); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if err := UnzipToDir(data, destination); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Error("a file of the previous content survived the extraction")
+	}
+	if !IsArtifactDir(destination) {
+		t.Error("the folder does not hold the new content")
+	}
+}
+
+//The extraction happens in a staging folder, so a broken archive must leave the
+//folder, that is already there, untouched
+func TestUnzipToDirKeepsExistingFolderOnFailure(t *testing.T) {
+	data := zipWithEntries(t, map[string]string{
+		"META-INF/MANIFEST.MF": sampleManifest,
+		"../escape.txt":        "owned",
+	})
+
+	parent := t.TempDir()
+	destination := filepath.Join(parent, "artifact")
+	if err := os.MkdirAll(destination, 0755); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(destination, "keep.txt"), []byte("mine"), 0644); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if err := UnzipToDir(data, destination); err == nil {
+		t.Fatal("expected an error for an entry pointing outside the target folder")
+	}
+
+	if _, err := os.Stat(filepath.Join(destination, "keep.txt")); err != nil {
+		t.Errorf("the existing folder was destroyed by the failed extraction: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(parent, "escape.txt")); !os.IsNotExist(err) {
+		t.Error("an entry escaped the target folder")
+	}
+}
+
+func TestUnzipToDirRejectsZipSlip(t *testing.T) {
+	tests := []struct {
+		name  string
+		entry string
+	}{
+		{"parent traversal", "../escape.txt"},
+		{"nested traversal", "src/../../escape.txt"},
+		{"absolute path", "/etc/escape.txt"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			data := zipWithEntries(t, map[string]string{test.entry: "owned"})
+
+			parent := t.TempDir()
+			if err := UnzipToDir(data, filepath.Join(parent, "artifact")); err == nil {
+				t.Fatalf("expected an error for entry %q", test.entry)
+			}
+
+			if _, err := os.Stat(filepath.Join(parent, "escape.txt")); !os.IsNotExist(err) {
+				t.Errorf("entry %q escaped the target folder", test.entry)
+			}
+		})
+	}
+}
+
+func TestUnzipToDirKeepsEmptyDirectories(t *testing.T) {
+	data := zipWithEntries(t, map[string]string{
+		"META-INF/MANIFEST.MF":     sampleManifest,
+		"src/main/resources/":      "",
+		"src/main/resources/x.prop": "urlPath=/erp/order",
+	})
+
+	destination := filepath.Join(t.TempDir(), "artifact")
+	if err := UnzipToDir(data, destination); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	info, err := os.Stat(filepath.Join(destination, "src", "main", "resources"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !info.IsDir() {
+		t.Error("src/main/resources is not a directory")
+	}
+}
+
+func TestUnzipToDirRejectsEmptyArchive(t *testing.T) {
+	buffer := &bytes.Buffer{}
+	archive := zip.NewWriter(buffer)
+	archive.Close()
+
+	if err := UnzipToDir(buffer.Bytes(), filepath.Join(t.TempDir(), "artifact")); err == nil {
+		t.Fatal("expected an error for an empty archive")
+	}
+}

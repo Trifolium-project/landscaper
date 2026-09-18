@@ -423,6 +423,87 @@ func classifyPackages(packageIds []string, environmentsOnSystem []*Environment, 
 	return bindings, warnings
 }
 
+//Physical package ids of one environment. Reads the tenant, that hosts the
+//environment, and keeps only the packages, that are bound to it, using the same
+//suffix matching as the landscape discovery. Packages delivered by SAP are
+//skipped, because their content cannot be downloaded. Returns the ids and a
+//list of non fatal warnings.
+func (landscape *Landscape) PackageIdsForEnvironment(environment *Environment) ([]string, []string, error) {
+
+	var warnings []string
+
+	if environment == nil {
+		return nil, warnings, fmt.Errorf("Environment is not set")
+	}
+	if environment.System == nil || environment.System.Client == nil {
+		return nil, warnings, fmt.Errorf("Environment %s refers to a system, that is not declared in the landscape file", environment.Id)
+	}
+
+	environmentsOnSystem := landscape.environmentsOfSystem(environment.System)
+
+	baseEnvironment, warning := pickBaseEnvironment(environmentsOnSystem, landscape.OriginalEnvironment)
+	if warning != "" {
+		warnings = append(warnings, fmt.Sprintf("System %s: %s", environment.System.Id, warning))
+	}
+
+	//An environment without a suffix only owns the packages without suffix when
+	//it is the base environment, that its system was reduced to
+	if environment.Suffix == "" && (baseEnvironment == nil || baseEnvironment.Id != environment.Id) {
+		warnings = append(warnings, fmt.Sprintf(
+			"Environment %s has no suffix and is not the base environment of system %s, no package is assigned to it",
+			environment.Id, environment.System.Id))
+		return []string{}, warnings, nil
+	}
+
+	integrationPackages, err := environment.System.Client.ReadAllIntegrationPackages()
+	if err != nil {
+		return nil, warnings, fmt.Errorf("Unable to read packages of system %s: %s", environment.System.Id, err)
+	}
+
+	packageIds := []string{}
+	packageModes := map[string]string{}
+	for _, integrationPackage := range integrationPackages {
+		packageIds = append(packageIds, integrationPackage.Id)
+		packageModes[integrationPackage.Id] = integrationPackage.Mode
+	}
+
+	packages, selectWarnings := selectPackagesForEnvironment(packageIds, packageModes, environmentsOnSystem, baseEnvironment, environment)
+	for _, selectWarning := range selectWarnings {
+		warnings = append(warnings, fmt.Sprintf("System %s: %s", environment.System.Id, selectWarning))
+	}
+
+	return packages, warnings, nil
+}
+
+//Physical package ids, that classifyPackages bound to the given environment,
+//without the ones, that SAP delivers read only
+func selectPackagesForEnvironment(packageIds []string, packageModes map[string]string,
+	environmentsOnSystem []*Environment, baseEnvironment *Environment, environment *Environment) ([]string, []string) {
+
+	bindings, warnings := classifyPackages(packageIds, environmentsOnSystem, baseEnvironment)
+
+	packages := []string{}
+	for _, packageBindings := range bindings {
+		for _, binding := range packageBindings {
+
+			if binding.Environment == nil || binding.Environment.Id != environment.Id {
+				continue
+			}
+
+			if packageModes[binding.PhysicalId] == readOnlyPackageMode {
+				warnings = append(warnings, fmt.Sprintf("Package %s is delivered by SAP and is skipped", binding.PhysicalId))
+				continue
+			}
+
+			packages = append(packages, binding.PhysicalId)
+		}
+	}
+
+	sort.Strings(packages)
+
+	return packages, warnings
+}
+
 //Whether a parameter key is not written to the landscape file. A pattern with a
 //trailing asterisk matches a prefix, every other pattern matches the whole key
 func isSkippedParameter(key string, patterns []string) bool {

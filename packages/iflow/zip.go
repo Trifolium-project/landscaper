@@ -273,6 +273,100 @@ func RewriteZipManifest(data []byte, updates map[string]string) ([]byte, error) 
 	return buffer.Bytes(), nil
 }
 
+//UnzipToDir extracts an artifact archive into destDir, the inverse of ZipDir.
+//The entries are written into a temporary folder next to destDir and moved into
+//place afterwards, so a failed extraction never destroys a folder that is
+//already there. An existing destDir is replaced completely.
+func UnzipToDir(data []byte, destDir string) error {
+
+	archive, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return err
+	}
+	if len(archive.File) == 0 {
+		return fmt.Errorf("archive is empty")
+	}
+
+	destDir = filepath.Clean(destDir)
+	parent := filepath.Dir(destDir)
+	if err := os.MkdirAll(parent, 0755); err != nil {
+		return err
+	}
+
+	//A sibling of the target, so that the final rename stays on one filesystem
+	staging, err := os.MkdirTemp(parent, "."+filepath.Base(destDir)+".*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(staging)
+
+	for _, file := range archive.File {
+
+		target, err := archiveEntryPath(staging, file.Name)
+		if err != nil {
+			return err
+		}
+
+		if file.FileInfo().IsDir() {
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return err
+			}
+			continue
+		}
+
+		//Only regular files belong in an iflow project. A symlink inside an
+		//archive is another way out of the target folder.
+		if !file.Mode().IsRegular() {
+			continue
+		}
+
+		source, err := file.Open()
+		if err != nil {
+			return err
+		}
+		content, err := io.ReadAll(source)
+		source.Close()
+		if err != nil {
+			return err
+		}
+
+		//Archives written by the tenant and by ZipDir carry no unix
+		//permissions, so a fixed mode is used instead of file.Mode()
+		if err := WriteFileAtomic(target, content, 0644); err != nil {
+			return err
+		}
+	}
+
+	//os.MkdirTemp creates the folder with 0700, every other folder the tool
+	//writes is 0755
+	if err := os.Chmod(staging, 0755); err != nil {
+		return err
+	}
+
+	if err := os.RemoveAll(destDir); err != nil {
+		return err
+	}
+
+	return os.Rename(staging, destDir)
+}
+
+//archiveEntryPath resolves an archive entry against the target folder and
+//refuses anything that would escape it, the zip slip attack
+func archiveEntryPath(destDir string, name string) (string, error) {
+
+	slashed := filepath.ToSlash(name)
+	if slashed == "" || strings.HasPrefix(slashed, "/") || filepath.IsAbs(name) {
+		return "", fmt.Errorf("archive entry %s has an absolute path", name)
+	}
+
+	target := filepath.Join(destDir, filepath.FromSlash(slashed))
+	if target != destDir && !strings.HasPrefix(target, destDir+string(os.PathSeparator)) {
+		return "", fmt.Errorf("archive entry %s points outside the target folder", name)
+	}
+
+	return target, nil
+}
+
 //WriteFileAtomic writes data through a temporary file in the target directory
 //and renames it into place, so an interrupted run never leaves a partial file.
 func WriteFileAtomic(path string, data []byte, mode os.FileMode) error {
