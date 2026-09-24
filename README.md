@@ -355,6 +355,97 @@ landscaper artifact list --pkg=SAPAribaAnalyticalReportingIntegrationwithThirdPa
 ```
 
 
+### Checking the deployment result
+
+Deploying tells you that the tenant accepted the request, not that the flow is
+running. `--wait` turns that into a checkable result:
+
+```bash
+landscaper artifact upload artifacts/Order_API_TEST_HARNESS --target-env QA --deploy --wait
+landscaper artifact deploy --artifact Order_API_TEST_HARNESS --wait
+landscaper artifact get --artifact Order_API_TEST_HARNESS
+```
+
+With `--wait` the upload table gains two columns:
+
+```
+#  ArtefactId                 Source  Package                 Uploaded Version  Action   Deployed  Runtime Status  Error
+1  TEST_DEPLOY_STATUS_BROKEN  folder  TestHarnessPreparation  1.0.7             created  true      ERROR           GenerationFailed ...
+```
+
+and a failed deployment is explained underneath:
+
+```
+Deploy error:
+GenerationFailed
+The generation and build of the artifact were unsuccessful. Please address the issues outlined below and redeploy the artifact.
+Generation and build failed for TEST_DEPLOY_STATUS_BROKEN as validation of resource is failed
+Script file 'script1.groovy' not found
+```
+
+`--timeout` (default `180s`) and `--interval` (default `5s`) control the wait.
+
+#### Exit codes
+
+The commands that report a deployment result exit with a code, so a script does
+not have to parse the output:
+
+| Code | Meaning |
+|---|---|
+| `0` | Deployed and `STARTED` |
+| `2` | The deployment failed, the tenant reported `ERROR` |
+| `3` | Still `STARTING` when the wait timed out |
+| `4` | The artifact is not deployed |
+| `1` | Anything else went wrong |
+
+#### JSON output
+
+`artifact get --output json` emits the same information as one document:
+
+```bash
+landscaper artifact get --artifact Order_API_TEST_HARNESS --output json
+```
+
+```json
+{
+  "id": "TEST_DEPLOY_STATUS_BROKEN",
+  "name": "Deploy status broken fixture",
+  "version": "1.0.7",
+  "package": "TestHarnessPreparation",
+  "runtime": {
+    "status": "ERROR",
+    "version": "1.0.7",
+    "deployedOn": "2026-09-24T09:55:21.348",
+    "deployedBy": "sb-...|it!b117912",
+    "error": {
+      "message": {
+        "subsystemName": "CONTENT",
+        "subsystemPartName": "CONTENT_DEPLOY",
+        "messageId": "GenerationFailed",
+        "messageText": ""
+      },
+      "parameter": ["The generation and build of the artifact were unsuccessful. ..."]
+    },
+    "errorText": "GenerationFailed\nThe generation and build ...\nScript file 'script1.groovy' not found"
+  },
+  "configuration": [{"key": "urlPath", "value": "/erp/order", "type": "xsd:string"}]
+}
+```
+
+`runtime` is `null` when the artifact is not deployed, and `runtime.error` is
+`null` when it deployed cleanly. `errorText` is the whole error tree flattened
+to lines, which is usually what a caller wants to read or feed back to a
+generator; `error` keeps the structure for anything that needs the message id.
+
+This is enough to drive an automated loop - generate a flow, upload it with
+`--deploy --wait`, and act on the exit code, reading `errorText` to decide what
+to fix.
+
+A caveat worth knowing: immediately after a redeploy the tenant keeps reporting
+the **previous** version as `STARTED` for a while. `--wait` therefore only
+accepts a runtime status whose version matches the one just uploaded, so a
+success is never reported for a deployment that has not happened yet.
+
 ### Audit log
 
 Every command can record what it did. Logging is **off by default** and enabled

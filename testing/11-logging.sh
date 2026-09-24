@@ -57,9 +57,15 @@ print(" ".join(sorted(types)))
 
 section "no log is written without --log"
 
+#Counted rather than asserting that logs/ is absent: a developer who has used
+#--log before would otherwise see this fail for no reason
+LOGS_BEFORE="$(find logs -name 'landscaper-*.log' -type f 2>/dev/null | wc -l | tr -d ' ')"
+
 run_landscaper artifact pack "$SOURCE" --skip-version-check --output "$OUT"
 assert_exit "pack succeeds" "$LAST_EXIT" 0
-assert_no_file "no default log folder appeared" "logs"
+
+LOGS_AFTER="$(find logs -name 'landscaper-*.log' -type f 2>/dev/null | wc -l | tr -d ' ')"
+assert_equals "no log was written to the default folder" "$LOGS_AFTER" "$LOGS_BEFORE"
 assert_no_file "no log folder appeared" "$LOG_DIR"
 
 section "--log writes a JSON Lines file into --log-dir"

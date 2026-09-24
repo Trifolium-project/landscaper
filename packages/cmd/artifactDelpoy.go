@@ -20,6 +20,7 @@ import (
 	"log"
 	"os"
 	"text/tabwriter"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -34,8 +35,18 @@ var artifactDelpoyCmd = &cobra.Command{
 	},
 }
 
+var (
+	deployWait     *bool
+	deployTimeout  *time.Duration
+	deployInterval *time.Duration
+)
+
 func init() {
 	artifactCmd.AddCommand(artifactDelpoyCmd)
+
+	deployWait = artifactDelpoyCmd.Flags().Bool("wait", false, "Wait until the deployment is finished and report the result")
+	deployTimeout = artifactDelpoyCmd.Flags().Duration("timeout", defaultDeployTimeout, "How long to wait for the deployment")
+	deployInterval = artifactDelpoyCmd.Flags().Duration("interval", defaultDeployInterval, "How often to ask the tenant while waiting")
 
 	// Here you will define your flags and configuration settings.
 
@@ -81,6 +92,22 @@ func artifactDeploy() {
 	fmt.Fprintf(writer, "%s\t%s\n", "Version:", artfct.Version)
 	fmt.Fprintf(writer, "%s\t%s\n", "Package:", artfct.PackageId)
 
+	if deployWait == nil || !*deployWait {
+		writer.Flush()
+		return
+	}
+
+	//The tenant keeps reporting the previous version as STARTED for a while
+	//after a redeploy, so the wait only accepts the version just deployed
+	status := waitForDeployment(system.Client, artfct.Id, artfct.Version, *deployTimeout, *deployInterval)
+
+	fmt.Fprintf(writer, "%s\t%s\n", "Runtime Status:", status.Summary())
+	if status.ErrorText != "" {
+		fmt.Fprintf(writer, "%s\t%s\n", "Error:", singleLine(status.ErrorText))
+	}
 	writer.Flush()
 
+	printDeployError(status)
+
+	exitWith(status.ExitCode())
 }

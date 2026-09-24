@@ -172,7 +172,15 @@ func (s *CPIClient) SetLogger(logger *auditlog.Logger) {
 	s.Logger = logger
 }
 
+//doRequest keeps the signature every existing caller uses. The status code is
+//discarded here, so anything that has to distinguish 404 from a real failure
+//calls doRequestWithStatus instead.
 func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
+	body, headers, _, err := s.doRequestWithStatus(req)
+	return body, headers, err
+}
+
+func (s *CPIClient) doRequestWithStatus(req *http.Request) ([]byte, http.Header, int, error) {
 
 	s.setAuth(req)
 
@@ -186,7 +194,7 @@ func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 	if err != nil {
 		call.SetError(err)
 		log.Printf("HTTP request error: %s", err)
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 	//log.Printf("Status code of HTTP request: %d", resp.StatusCode)
 
@@ -195,7 +203,7 @@ func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 
 	if err != nil {
 		call.SetError(err)
-		return nil, nil, err
+		return nil, nil, resp.StatusCode, err
 	}
 
 	//The status code is not carried by the error returned below, so the audit
@@ -213,9 +221,9 @@ func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 
 	if httpCodeGroup != 2 {
 
-		return nil, nil, fmt.Errorf("%s", body)
+		return nil, nil, resp.StatusCode, fmt.Errorf("%s", body)
 	}
-	return body, resp.Header, nil
+	return body, resp.Header, resp.StatusCode, nil
 }
 
 //type staticTokenSource struct {
