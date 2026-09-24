@@ -15,36 +15,126 @@ Below you can find zoomed example of CPI landscape. It can contain multiple "env
 
 ### Quick start
 
-0. Get landscaper
+0. Install landscaper
 
+Every release ships one asset, `landscaper.zip`, holding a static binary for each
+platform. There is nothing to compile and no runtime to install - pick your
+binary out of the archive, make it executable and put it on your `PATH`.
 
- - Download latest release from [Releases](https://github.com/Trifolium-project/landscaper/releases)
- 
- - OR build from source
+| Platform | Binary in the archive |
+|---|---|
+| macOS, Apple Silicon (M1 and later) | `build/landscaper-darwin-arm64` |
+| macOS, Intel | `build/landscaper-darwin-amd64` |
+| Linux, x86-64 | `build/landscaper-linux-amd64` |
+| Linux, ARM64 | `build/landscaper-linux-arm64` |
+| Windows, x86-64 | `build/landscaper-windows-amd64.exe` |
+
+Unsure which one? Run `uname -sm` on macOS or Linux: `arm64`/`aarch64` means the
+ARM build, `x86_64` means the amd64 one.
+
+**Releases are marked as pre-release, so there is no "latest" download URL** -
+`/releases/latest/download/...` returns 404. Install a version by name, or let
+the commands below look the newest one up.
+
+<details open>
+<summary><b>macOS</b></summary>
+
+```bash
+# Newest release, Apple Silicon. Use landscaper-darwin-amd64 on an Intel Mac.
+VERSION=$(curl -s https://api.github.com/repos/Trifolium-project/landscaper/releases | grep -m1 '"tag_name"' | cut -d'"' -f4)
+curl -L -o landscaper.zip "https://github.com/Trifolium-project/landscaper/releases/download/$VERSION/landscaper.zip"
+
+unzip -o landscaper.zip
+sudo install -m 755 build/landscaper-darwin-arm64 /usr/local/bin/landscaper
+
+landscaper --help
+```
+
+On Apple Silicon the binaries are ad-hoc signed and simply run. On an Intel Mac
+they are unsigned, so if you downloaded the archive with a **browser** macOS may
+refuse to start it with *"cannot be opened because the developer cannot be
+verified"*. Clear the quarantine flag and try again:
+
+```bash
+sudo xattr -d com.apple.quarantine /usr/local/bin/landscaper
+```
+
+Downloading with `curl`, as above, does not set that flag in the first place.
+
+</details>
+
+<details open>
+<summary><b>Linux</b></summary>
+
+```bash
+# Newest release, x86-64. Use landscaper-linux-arm64 on ARM.
+VERSION=$(curl -s https://api.github.com/repos/Trifolium-project/landscaper/releases | grep -m1 '"tag_name"' | cut -d'"' -f4)
+curl -L -o landscaper.zip "https://github.com/Trifolium-project/landscaper/releases/download/$VERSION/landscaper.zip"
+
+unzip -o landscaper.zip
+sudo install -m 755 build/landscaper-linux-amd64 /usr/local/bin/landscaper
+
+landscaper --help
+```
+
+Without root, install into your own `PATH` instead:
+
+```bash
+mkdir -p ~/.local/bin
+install -m 755 build/landscaper-linux-amd64 ~/.local/bin/landscaper
+export PATH="$HOME/.local/bin:$PATH"   # add to ~/.bashrc to make it permanent
+```
+
+</details>
+
+<details open>
+<summary><b>Windows (PowerShell)</b></summary>
+
+```powershell
+# Newest release
+$version = (Invoke-RestMethod https://api.github.com/repos/Trifolium-project/landscaper/releases)[0].tag_name
+Invoke-WebRequest "https://github.com/Trifolium-project/landscaper/releases/download/$version/landscaper.zip" -OutFile landscaper.zip
+
+Expand-Archive landscaper.zip -DestinationPath . -Force
+New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Programs\landscaper" | Out-Null
+Copy-Item build\landscaper-windows-amd64.exe "$env:LOCALAPPDATA\Programs\landscaper\landscaper.exe" -Force
+
+# Add to PATH for future sessions
+[Environment]::SetEnvironmentVariable(
+  "Path",
+  [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:LOCALAPPDATA\Programs\landscaper",
+  "User")
+
+# Reopen the terminal, then:
+landscaper --help
+```
+
+</details>
+
+Installing a **specific version** is the same commands with the lookup replaced
+by the tag you want:
+
+```bash
+curl -L -o landscaper.zip https://github.com/Trifolium-project/landscaper/releases/download/v0.6.0/landscaper.zip
+```
+
+`landscaper` has no self-update and no `--version` flag; to upgrade, repeat the
+install and overwrite the binary. To uninstall, delete it - the tool writes
+nothing outside the directory you run it in.
+
+ - OR build from source, which needs Go 1.17 or newer:
 
 ```bash
 git clone git@github.com:Trifolium-project/landscaper.git
+cd landscaper
 ```
 
 ```bash
-./go-executable-build.bash .
+./go-executable-build.bash .          # all platforms, into build/
+go build -o landscaper .              # or just this machine
 ```
 
-1. Install landscaper
-
- - Unpack landscaper.zip
-```bash
-unzip landscaper.zip
-```
- - Move executable to PATH folder. Select appropriate executable, for example for Apple Silicon processors:
-
-```bash
-sudo mv build/landscaper-darwin-arm64 /usr/local/bin/landscaper
-```
-
-
-
-2. Prerequisites
+1. Prerequisites
 
 
  - Create directory
@@ -85,7 +175,7 @@ DEV_PASSWORD_ENV_VAR=1qazxsw23edcvfr4
 EOT
 ```
 
-3. Use landscaper
+2. Use landscaper
 
  - Copy package from discover to design area
 
@@ -264,6 +354,56 @@ landscaper artifact list --pkg=SAPAribaAnalyticalReportingIntegrationwithThirdPa
 
 ```
 
+
+### Audit log
+
+Every command can record what it did. Logging is **off by default** and enabled
+per run with `--log`:
+
+```bash
+landscaper artifact upload artifacts/Order_API_TEST_HARNESS --target-env QA --log
+```
+
+That writes one file per run, `logs/landscaper-YYYYMMDD-HHMMSS.log`, as JSON
+Lines - one JSON object per line. Use `--log-dir` to write somewhere else:
+
+```bash
+landscaper package move --target-env QA --log --log-dir /var/log/landscaper
+```
+
+Four kinds of record are written:
+
+| `type` | What it is |
+|---|---|
+| `run` | The command, the parameters it was given, and how it finished |
+| `http` | One call to the tenant: method, url, status, duration, headers and bodies |
+| `item` | The outcome of one artifact or package, the same status the table prints |
+| `log` | A line of ordinary output, including the message of a fatal error |
+
+So the whole run is greppable afterwards:
+
+```bash
+#What failed, and what did the tenant say about it?
+jq -r 'select(.type=="http" and .status>=400) | "\(.status) \(.url)\n\(.response_body.text)"' logs/landscaper-*.log
+
+#Did the run succeed?
+jq -r 'select(.type=="run" and .phase=="end") | .status' logs/landscaper-*.log
+```
+
+**Credentials are never written.** `Authorization`, `X-CSRF-Token`, `Cookie` and
+`Set-Cookie` are recorded with their value replaced by `<redacted>`, so the log
+shows that authentication was sent without showing what was sent. Integration
+flow archives are not written either - an uploaded or downloaded artifact is
+recorded as a byte count, not as megabytes of base64.
+
+Response bodies are otherwise recorded in full, which is what makes a failed
+transport diagnosable after the fact. **The files therefore contain real tenant
+data**: `logs/` is gitignored and the files are created mode `0600`.
+
+Two limitations worth knowing:
+
+ - Only integration content calls are recorded. When the landscape uses OAuth (`tokenURL` is set), the token request that precedes every call is made by a separate HTTP client and does not appear, so the log is not a complete network trace.
+ - If `--log` is given and the log file cannot be created, the command **fails** instead of running unrecorded.
 
 ### Landscape definition
 

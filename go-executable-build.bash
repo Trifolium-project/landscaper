@@ -10,6 +10,9 @@ package_split=(${package//\// })
 #package_name=${package_split[-1]}
 package_name="landscaper"	
 platforms=("windows/amd64" "darwin/amd64" "darwin/arm64" "linux/amd64" "linux/arm64")
+
+#Paths of the binaries produced below, used to build the archive
+outputs=()
 echo 'Starting build...'
 for platform in "${platforms[@]}"
 do
@@ -27,18 +30,19 @@ do
 		exit 1
 	fi
     echo 'Completed: '$output_name
+	outputs+=("$output_name")
 done
 
 if [ -n "$2" ] && [ $2 = "archive" ]; then
 	echo 'Compress build...'
-	zip -r build/landscaper.zip build
+	#Archive the binaries that were just built, and nothing else. zip UPDATES
+	#an existing archive, so a stale landscaper.zip would keep entries from a
+	#previous run - including junk such as .DS_Store - hence the rm.
+	rm -f build/landscaper.zip
+	zip build/landscaper.zip "${outputs[@]}"
 
 	echo 'Clean files...'
-	rm build/landscaper-windows-amd64.exe
-	rm build/landscaper-darwin-amd64
-	rm build/landscaper-darwin-arm64
-	rm build/landscaper-linux-amd64
-	rm build/landscaper-linux-arm64
+	rm -f "${outputs[@]}"
 fi
 
 

@@ -20,9 +20,11 @@ import (
 	"log"
 	"os"
 
+	"github.com/Trifolium-project/landscaper/packages/auditlog"
 	"github.com/Trifolium-project/landscaper/packages/landscape"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -33,15 +35,27 @@ var cfgFile string
 var landscapeFile *string
 var globalLandscape *landscape.Landscape
 
+//Default folder for audit logs
+const defaultLogDir = "logs"
+
 //Persistent global flag
 var (
 	environment *string
 	pkg         *string
 	artifact 	*string
+	logEnabled  *bool
+	logDir      *string
 )
+
+//Audit log of the run. Nil means logging is off, which is the default, and
+//every method of the logger is safe to call on a nil value.
+var auditLogger *auditlog.Logger
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		recordRunStart(cmd)
+	},
 	Use:   "landscaper",
 	Short: "SAP CPI Client",
 	Long: `Landscaper is an CLI tool for managing SAP Cloud Platform Integration tenants.`,
@@ -53,10 +67,27 @@ var rootCmd = &cobra.Command{
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+
+	//A panic unwinds, unlike the os.Exit of log.Fatalln, so the run can still
+	//be closed off before the process dies. getCSRFToken panics whenever the
+	//tenant answers a token fetch with anything but 2xx.
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			auditLogger.RunEnd("panic", fmt.Sprint(recovered))
+			auditLogger.Close()
+			panic(recovered)
+		}
+	}()
+
 	err := rootCmd.Execute()
 	if err != nil {
+		auditLogger.RunEnd("failed", err.Error())
+		auditLogger.Close()
 		os.Exit(1)
 	}
+
+	auditLogger.RunEnd("ok", "")
+	auditLogger.Close()
 }
 
 func init() {
@@ -73,6 +104,9 @@ func init() {
 
 	artifact = rootCmd.PersistentFlags().String("artifact", "", "Artifact Id")
 
+	logEnabled = rootCmd.PersistentFlags().Bool("log", false, "Write an audit log of the run, including every call to the tenant")
+	logDir = rootCmd.PersistentFlags().String("log-dir", defaultLogDir, "Folder for the audit log")
+
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
@@ -82,6 +116,8 @@ func init() {
 func initConfig() {
 
 	_ = godotenv.Load()
+
+	startAuditLog()
 
 	//Set landscape configuration path
 	var landscapeFilePath string 
@@ -99,6 +135,7 @@ func initConfig() {
 		log.Fatalln("Unable to read landscaper configuration")
 	}
 	globalLandscape = landscape
+	globalLandscape.SetLogger(auditLogger)
 
 	//Set default environment
 	if(*environment == "" ){
@@ -149,4 +186,59 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+//startAuditLog opens the log file when --log was given. Failure is fatal: the
+//user asked for a record of what this run did to a tenant, and performing the
+//operation without one is worse than not performing it.
+func startAuditLog() {
+
+	if logEnabled == nil || !*logEnabled {
+		return
+	}
+
+	directory := defaultLogDir
+	if logDir != nil && *logDir != "" {
+		directory = *logDir
+	}
+
+	logger, err := auditlog.New(directory)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	auditLogger = logger
+
+	//Everything the program already writes with the standard logger, including
+	//all of the log.Fatalln exits, is recorded without changing those callers
+	log.SetOutput(auditLogger.LogWriter(os.Stderr))
+
+	fmt.Printf("Writing the audit log to %s\n", auditLogger.Path())
+}
+
+//recordRunStart writes the command and the parameters it was given. It runs as
+//a cobra hook rather than from initConfig, which has no access to the command
+//or to the flags that were actually set.
+func recordRunStart(cmd *cobra.Command) {
+
+	if auditLogger == nil || cmd == nil {
+		return
+	}
+
+	flags := map[string]string{}
+	cmd.Flags().Visit(func(flag *pflag.Flag) {
+		flags[flag.Name] = flag.Value.String()
+	})
+
+	selectedEnvironment := ""
+	if environment != nil {
+		selectedEnvironment = *environment
+	}
+
+	auditLogger.RunStart(cmd.CommandPath(), selectedEnvironment, auditlog.RedactFlags(flags))
+}
+
+//auditItem records the outcome of one artifact or package. Safe to call when
+//logging is off, and safe in tests, where initConfig never runs.
+func auditItem(fields map[string]interface{}) {
+	auditLogger.Item(fields)
 }
