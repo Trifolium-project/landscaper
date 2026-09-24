@@ -15,36 +15,126 @@ Below you can find zoomed example of CPI landscape. It can contain multiple "env
 
 ### Quick start
 
-0. Get landscaper
+0. Install landscaper
 
+Every release ships one asset, `landscaper.zip`, holding a static binary for each
+platform. There is nothing to compile and no runtime to install - pick your
+binary out of the archive, make it executable and put it on your `PATH`.
 
- - Download latest release from [Releases](https://github.com/Trifolium-project/landscaper/releases)
- 
- - OR build from source
+| Platform | Binary in the archive |
+|---|---|
+| macOS, Apple Silicon (M1 and later) | `build/landscaper-darwin-arm64` |
+| macOS, Intel | `build/landscaper-darwin-amd64` |
+| Linux, x86-64 | `build/landscaper-linux-amd64` |
+| Linux, ARM64 | `build/landscaper-linux-arm64` |
+| Windows, x86-64 | `build/landscaper-windows-amd64.exe` |
+
+Unsure which one? Run `uname -sm` on macOS or Linux: `arm64`/`aarch64` means the
+ARM build, `x86_64` means the amd64 one.
+
+**Releases are marked as pre-release, so there is no "latest" download URL** -
+`/releases/latest/download/...` returns 404. Install a version by name, or let
+the commands below look the newest one up.
+
+<details open>
+<summary><b>macOS</b></summary>
+
+```bash
+# Newest release, Apple Silicon. Use landscaper-darwin-amd64 on an Intel Mac.
+VERSION=$(curl -s https://api.github.com/repos/Trifolium-project/landscaper/releases | grep -m1 '"tag_name"' | cut -d'"' -f4)
+curl -L -o landscaper.zip "https://github.com/Trifolium-project/landscaper/releases/download/$VERSION/landscaper.zip"
+
+unzip -o landscaper.zip
+sudo install -m 755 build/landscaper-darwin-arm64 /usr/local/bin/landscaper
+
+landscaper --help
+```
+
+On Apple Silicon the binaries are ad-hoc signed and simply run. On an Intel Mac
+they are unsigned, so if you downloaded the archive with a **browser** macOS may
+refuse to start it with *"cannot be opened because the developer cannot be
+verified"*. Clear the quarantine flag and try again:
+
+```bash
+sudo xattr -d com.apple.quarantine /usr/local/bin/landscaper
+```
+
+Downloading with `curl`, as above, does not set that flag in the first place.
+
+</details>
+
+<details open>
+<summary><b>Linux</b></summary>
+
+```bash
+# Newest release, x86-64. Use landscaper-linux-arm64 on ARM.
+VERSION=$(curl -s https://api.github.com/repos/Trifolium-project/landscaper/releases | grep -m1 '"tag_name"' | cut -d'"' -f4)
+curl -L -o landscaper.zip "https://github.com/Trifolium-project/landscaper/releases/download/$VERSION/landscaper.zip"
+
+unzip -o landscaper.zip
+sudo install -m 755 build/landscaper-linux-amd64 /usr/local/bin/landscaper
+
+landscaper --help
+```
+
+Without root, install into your own `PATH` instead:
+
+```bash
+mkdir -p ~/.local/bin
+install -m 755 build/landscaper-linux-amd64 ~/.local/bin/landscaper
+export PATH="$HOME/.local/bin:$PATH"   # add to ~/.bashrc to make it permanent
+```
+
+</details>
+
+<details open>
+<summary><b>Windows (PowerShell)</b></summary>
+
+```powershell
+# Newest release
+$version = (Invoke-RestMethod https://api.github.com/repos/Trifolium-project/landscaper/releases)[0].tag_name
+Invoke-WebRequest "https://github.com/Trifolium-project/landscaper/releases/download/$version/landscaper.zip" -OutFile landscaper.zip
+
+Expand-Archive landscaper.zip -DestinationPath . -Force
+New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Programs\landscaper" | Out-Null
+Copy-Item build\landscaper-windows-amd64.exe "$env:LOCALAPPDATA\Programs\landscaper\landscaper.exe" -Force
+
+# Add to PATH for future sessions
+[Environment]::SetEnvironmentVariable(
+  "Path",
+  [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:LOCALAPPDATA\Programs\landscaper",
+  "User")
+
+# Reopen the terminal, then:
+landscaper --help
+```
+
+</details>
+
+Installing a **specific version** is the same commands with the lookup replaced
+by the tag you want:
+
+```bash
+curl -L -o landscaper.zip https://github.com/Trifolium-project/landscaper/releases/download/v0.6.0/landscaper.zip
+```
+
+`landscaper` has no self-update and no `--version` flag; to upgrade, repeat the
+install and overwrite the binary. To uninstall, delete it - the tool writes
+nothing outside the directory you run it in.
+
+ - OR build from source, which needs Go 1.17 or newer:
 
 ```bash
 git clone git@github.com:Trifolium-project/landscaper.git
+cd landscaper
 ```
 
 ```bash
-./go-executable-build.bash .
+./go-executable-build.bash .          # all platforms, into build/
+go build -o landscaper .              # or just this machine
 ```
 
-1. Install landscaper
-
- - Unpack landscaper.zip
-```bash
-unzip landscaper.zip
-```
- - Move executable to PATH folder. Select appropriate executable, for example for Apple Silicon processors:
-
-```bash
-sudo mv build/landscaper-darwin-arm64 /usr/local/bin/landscaper
-```
-
-
-
-2. Prerequisites
+1. Prerequisites
 
 
  - Create directory
@@ -85,7 +175,7 @@ DEV_PASSWORD_ENV_VAR=1qazxsw23edcvfr4
 EOT
 ```
 
-3. Use landscaper
+2. Use landscaper
 
  - Copy package from discover to design area
 
