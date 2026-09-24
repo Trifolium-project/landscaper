@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/Trifolium-project/landscaper/packages/cpiclient"
 	"github.com/Trifolium-project/landscaper/packages/iflow"
@@ -37,6 +38,9 @@ var (
 	uploadBump             *string
 	uploadSetVersion       *string
 	uploadOutputDir        *string
+	uploadWait             *bool
+	uploadTimeout          *time.Duration
+	uploadInterval         *time.Duration
 )
 
 //uploadRow is a single line of the report printed at the end of the run
@@ -48,6 +52,8 @@ type uploadRow struct {
 	UploadVersion string
 	Action        string
 	Deployed      bool
+	//Set only when --wait was given alongside --deploy
+	Status *deployStatus
 }
 
 // uploadCmd represents the artifact upload command
@@ -82,6 +88,9 @@ func init() {
 	uploadBump = artifactUploadCmd.Flags().String("bump", "", "Increase the version without asking: patch, minor or major")
 	uploadSetVersion = artifactUploadCmd.Flags().String("set-version", "", "Use this exact version instead of asking")
 	uploadOutputDir = artifactUploadCmd.Flags().String("output", defaultArtifactOutputDir, "Folder for the archives generated from folders")
+	uploadWait = artifactUploadCmd.Flags().Bool("wait", false, "With --deploy, wait until each deployment is finished and report the result")
+	uploadTimeout = artifactUploadCmd.Flags().Duration("timeout", defaultDeployTimeout, "How long to wait for a deployment")
+	uploadInterval = artifactUploadCmd.Flags().Duration("interval", defaultDeployInterval, "How often to ask the tenant while waiting")
 
 	artifactUploadCmd.MarkFlagRequired("target-env")
 }
@@ -103,16 +112,29 @@ func artifactUpload(paths []string) {
 		targetEnvironment, *uploadBump, *uploadSetVersion,
 	)
 
+	waiting := uploadWait != nil && *uploadWait && *uploadDeploy
+
 	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
-	fmt.Fprintf(writer, "#\tArtefactId\tSource\tPackage\tVersion in %s\tUploaded Version\tAction\tDeployed\n", targetEnvironment.Id)
+	if waiting {
+		fmt.Fprintf(writer, "#\tArtefactId\tSource\tPackage\tVersion in %s\tUploaded Version\tAction\tDeployed\tRuntime Status\tError\n", targetEnvironment.Id)
+	} else {
+		fmt.Fprintf(writer, "#\tArtefactId\tSource\tPackage\tVersion in %s\tUploaded Version\tAction\tDeployed\n", targetEnvironment.Id)
+	}
 
 	rows := make([]*uploadRow, 0, len(paths))
 
 	flush := func() {
 		for index, row := range rows {
-			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%t\n",
-				index+1, row.ArtifactId, row.Source, row.PackageId,
-				row.TenantVersion, row.UploadVersion, row.Action, row.Deployed)
+			if waiting {
+				fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%t\t%s\t%s\n",
+					index+1, row.ArtifactId, row.Source, row.PackageId,
+					row.TenantVersion, row.UploadVersion, row.Action, row.Deployed,
+					row.Status.Summary(), deployStatusError(row.Status))
+			} else {
+				fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%t\n",
+					index+1, row.ArtifactId, row.Source, row.PackageId,
+					row.TenantVersion, row.UploadVersion, row.Action, row.Deployed)
+			}
 
 			//The audit log carries the same status vocabulary as the table
 			auditItem(map[string]interface{}{
@@ -136,6 +158,15 @@ func artifactUpload(paths []string) {
 			log.Fatalln(err)
 		}
 		rows = append(rows, row)
+
+		//A failed deployment stops the run, like any other failure, but the
+		//rows already produced are still reported
+		if row.Status != nil && row.Status.ExitCode() != exitDeployed {
+			flush()
+			printDeployError(row.Status)
+			log.Printf("Deployment of %s did not succeed: %s", row.ArtifactId, row.Status.Summary())
+			exitWith(row.Status.ExitCode())
+		}
 	}
 
 	flush()
@@ -294,6 +325,14 @@ func uploadArtifact(path string, targetEnvironment *landscape.Environment) (*upl
 			return nil, err
 		}
 		row.Deployed = true
+
+		if uploadWait != nil && *uploadWait {
+			//The runtime keeps reporting the previous version as STARTED for a
+			//while after a redeploy, so the wait only accepts the version that
+			//was just uploaded
+			row.Status = waitForDeployment(client, targetArtifactId, row.UploadVersion,
+				*uploadTimeout, *uploadInterval)
+		}
 	}
 
 	return row, nil

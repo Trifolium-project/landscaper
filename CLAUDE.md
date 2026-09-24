@@ -47,6 +47,8 @@ handling - manifests, versions, zip - with no cobra and no HTTP.
 | `packages/cmd/configUpdate.go` | Update artifact configuration parameters |
 | `packages/cpiclient/cpiclient.go` | The whole client: auth, CSRF, all OData calls |
 | `packages/cpiclient/parse.go` | Null-safe JSON helpers, paginated package read |
+| `packages/cpiclient/errorinformation.go` | Why a deployment failed. Parses three payload shapes, none of them the documented one |
+| `packages/cmd/deployStatus.go` | `--wait` polling, the runtime version check, the exit codes |
 | `packages/landscape/landscape.go` | YAML model, `NewLandscape`, `GetEnvironment`, `FindPackageForArtifact` |
 | `packages/landscape/discover.go` | Read a tenant back into a landscape model, suffix matching |
 | `packages/landscape/export.go` | Write `packages:` back into YAML preserving comments |
@@ -77,9 +79,9 @@ body instead.
 
 - One command per file, named `<parent><Action>.go` in lowerCamel: `artifactList.go`, `packageMove.go`.
 - Structure: Apache license header -> `package cmd` -> package-level flag pointer vars -> `var xxxCmd = &cobra.Command{...}` -> `func init()` registering on the parent -> unexported action func.
-- `Run` is always a thin delegate. **No `RunE` anywhere** - errors go to `log.Fatalln`, which exits 1.
+- `Run` is always a thin delegate. **No `RunE` anywhere** - errors go to `log.Fatalln`, which exits 1. The commands reporting a deployment result end through `exitWith` instead, for the documented codes 0/2/3/4.
 - Every action opens with the `globalLandscape == nil` guard.
-- Output is `text/tabwriter` to stdout: either a numbered table with a `#` column, or `===Section===` key/value blocks. No JSON output, no `--output-format`.
+- Output is `text/tabwriter` to stdout: either a numbered table with a `#` column, or `===Section===` key/value blocks. The one exception is `artifact get --output json`, added for automated callers; `text` stays the default everywhere.
 - Comments are `//Text` with no space, matching the existing files.
 
 ## Traps
@@ -91,6 +93,8 @@ Things that are expensive to rediscover. Read these before changing anything.
 - **`artifact download` is not the mirror of `artifact upload`.** It writes tenant ids **verbatim**, so downloading from a suffixed environment yields `artifacts/MyPackageQA/MyFlowQA/` with `Bundle-SymbolicName: MyFlowQA` left as it is. Such a folder uploads back to `QA` (via `trimTargetSuffix`) but **not** to `Dev`, and `artifact pack` needs `--skip-version-check`. See `changelog/0004-artifact-download.md`.
 - **The audit log must stay unbuffered and must never import `log`.** `--log` writes one `os.File.Write` per record because `log.Fatalln` exits through `os.Exit`, which runs no defers and flushes nothing. And the standard logger holds its mutex across the write it makes to `auditlog.LogWriter`, so logging from inside that writer deadlocks the process instead of recursing. See `changelog/0005-audit-logging.md`.
 - **Never dump an `*http.Request` or its headers.** `setAuth` populates `Authorization` before anything else in `doRequest` can see the request, and with Basic auth that header is a reversible `base64(user:password)`. The old `VerboseLog` blocks did exactly this and were removed. Route headers through `auditlog.RedactHeaders`.
+- **After a redeploy the tenant still reports the OLD version as `STARTED`.** A poll that only looks at the status therefore reports success for a deployment that has not happened. `waitForDeployment` accepts a status only once the runtime `Version` equals the version just deployed. See `changelog/0006-deploy-status.md`.
+- **The `ErrorInformation` payload does not match SAP's own swagger**, which defines it as an object with one `Id` field. The real answer puts `parameter` **beside** `message`, not inside it, and `messageText` is usually empty - so reading only `message` yields `GenerationFailed` and drops the one line that names the cause. `cpiclient/errorinformation.go` handles three observed shapes.
 - **Only the original environment owns the version.** Uploading anywhere else takes the version from `META-INF/MANIFEST.MF` as it is, never writes the working tree, and ignores `--bump`/`--set-version`. A pipeline deploying to QA can therefore not produce a commit.
 - **`Version == "Active"`** in an API response means the artifact is a **draft** in the tenant, not a version string. `packageMove` aborts on it; `artifact pack` cannot compare it.
 - **`assets/IntegrationContent.yaml` is 159KB** (~40K tokens). Grep it for the endpoint you need.

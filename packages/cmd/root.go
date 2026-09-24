@@ -188,6 +188,21 @@ func initConfig() {
 	}
 }
 
+//exitWith ends the process with a specific code. The commands that report a
+//deployment result need codes beyond 0 and 1, and os.Exit runs no deferred
+//function, so the audit log has to be closed off here.
+func exitWith(code int) {
+
+	status := "ok"
+	if code != 0 {
+		status = "failed"
+	}
+	auditLogger.RunEnd(status, fmt.Sprintf("exit code %d", code))
+	auditLogger.Close()
+
+	os.Exit(code)
+}
+
 //startAuditLog opens the log file when --log was given. Failure is fatal: the
 //user asked for a record of what this run did to a tenant, and performing the
 //operation without one is worse than not performing it.
