@@ -355,6 +355,56 @@ landscaper artifact list --pkg=SAPAribaAnalyticalReportingIntegrationwithThirdPa
 ```
 
 
+### Audit log
+
+Every command can record what it did. Logging is **off by default** and enabled
+per run with `--log`:
+
+```bash
+landscaper artifact upload artifacts/Order_API_TEST_HARNESS --target-env QA --log
+```
+
+That writes one file per run, `logs/landscaper-YYYYMMDD-HHMMSS.log`, as JSON
+Lines - one JSON object per line. Use `--log-dir` to write somewhere else:
+
+```bash
+landscaper package move --target-env QA --log --log-dir /var/log/landscaper
+```
+
+Four kinds of record are written:
+
+| `type` | What it is |
+|---|---|
+| `run` | The command, the parameters it was given, and how it finished |
+| `http` | One call to the tenant: method, url, status, duration, headers and bodies |
+| `item` | The outcome of one artifact or package, the same status the table prints |
+| `log` | A line of ordinary output, including the message of a fatal error |
+
+So the whole run is greppable afterwards:
+
+```bash
+#What failed, and what did the tenant say about it?
+jq -r 'select(.type=="http" and .status>=400) | "\(.status) \(.url)\n\(.response_body.text)"' logs/landscaper-*.log
+
+#Did the run succeed?
+jq -r 'select(.type=="run" and .phase=="end") | .status' logs/landscaper-*.log
+```
+
+**Credentials are never written.** `Authorization`, `X-CSRF-Token`, `Cookie` and
+`Set-Cookie` are recorded with their value replaced by `<redacted>`, so the log
+shows that authentication was sent without showing what was sent. Integration
+flow archives are not written either - an uploaded or downloaded artifact is
+recorded as a byte count, not as megabytes of base64.
+
+Response bodies are otherwise recorded in full, which is what makes a failed
+transport diagnosable after the fact. **The files therefore contain real tenant
+data**: `logs/` is gitignored and the files are created mode `0600`.
+
+Two limitations worth knowing:
+
+ - Only integration content calls are recorded. When the landscape uses OAuth (`tokenURL` is set), the token request that precedes every call is made by a separate HTTP client and does not appear, so the log is not a complete network trace.
+ - If `--log` is given and the log file cannot be created, the command **fails** instead of running unrecorded.
+
 ### Landscape definition
 
 Landscape YAML file consists of multiple objects and relationships between them. Prior using landscaper CLI tool, you need to define basic parameters of your integration landscape, such as CPI systems, integration packages and flows, configuration and so on. Very basic example of Landscape definition can be found [here](./conf/landscape-example.yaml). 

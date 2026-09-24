@@ -278,9 +278,29 @@ func packageMove() {
 
 			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%t\t%t\n", index+1, newArtifact.Id, newArtifact.Version, newArtifact.PackageId, true, *toDeploy)
 
+			auditItem(map[string]interface{}{
+				"operation":   "move",
+				"artifact":    newArtifact.Id,
+				"package":     newArtifact.PackageId,
+				"version":     newArtifact.Version,
+				"status":      "transferred",
+				"transferred": true,
+				"deployed":    *toDeploy,
+			})
+
 			//fmt.Fprintf(writer, "%d\t%s\t%s\n", index, pkg.Id, pkg.Name)
 		} else {
 			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%t\t%t\n", index+1, id, sourceArtifact.Version, targetPackageId, false, false)
+
+			auditItem(map[string]interface{}{
+				"operation":   "move",
+				"artifact":    id,
+				"package":     targetPackageId,
+				"version":     sourceArtifact.Version,
+				"status":      "unchanged",
+				"transferred": false,
+				"deployed":    false,
+			})
 		}
 	}
 	writer.Flush()

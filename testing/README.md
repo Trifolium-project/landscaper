@@ -35,6 +35,7 @@ LANDSCAPER_TEST_TENANT=1 ./testing/04-upload-target-env.sh
 | `07-deploy.sh` | **writes, deploys** | `--deploy` and the runtime status afterwards |
 | `08-upload-errors.sh` | no* | Missing `--target-env`, unknown environment, bad paths, undeclared artifact |
 | `09-cleanup.sh` | no | Restores the fixture and removes the scratch directory |
+| `11-logging.sh` | no | `--log`: off by default, JSON Lines output, `--log-dir`, file permissions, no credential in the file, a failed run recorded as failed |
 | `10-download.sh` | **reads** | `artifact download`: the folder layout, the version, the skip and `--force` rules, verbatim ids for a suffixed environment, `--download-all` scoping, the flag validation |
 
 \* `08` runs one extra tenant assertion when `LANDSCAPER_TEST_TENANT=1`.

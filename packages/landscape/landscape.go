@@ -24,6 +24,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/Trifolium-project/landscaper/packages/auditlog"
 	"github.com/Trifolium-project/landscaper/packages/cpiclient"
 	"github.com/joho/godotenv"
 	"golang.org/x/term"
@@ -134,6 +135,22 @@ func (landscape *Landscape) GetSystem4Environment(environment *string) (*System,
 }
 
 // Get environment by ID
+//SetLogger attaches an audit log to the client of every system. Environments
+//share the System values held here, so one walk covers every client a command
+//can reach.
+func (landscape *Landscape) SetLogger(logger *auditlog.Logger) {
+
+	if landscape == nil {
+		return
+	}
+
+	for _, system := range landscape.Systems {
+		if system != nil && system.Client != nil {
+			system.Client.SetLogger(logger)
+		}
+	}
+}
+
 func (landscape *Landscape) GetEnvironment(environment string) (*Environment, error) {
 
 	env := landscape.Environments[environment]

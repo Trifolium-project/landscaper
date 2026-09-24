@@ -136,6 +136,23 @@ func configUpdate() {
 
 	for _, newConfiguration := range newConfigurations {
 		err = system.Client.UpdateIntegrationDesigntimeArtifactConfiguration(*artifact, "Active", newConfiguration)
+
+		//This error is not checked by the command. The audit log is the only
+		//place a rejected parameter becomes visible.
+		status := "updated"
+		failure := ""
+		if err != nil {
+			status = "failed"
+			failure = err.Error()
+		}
+		auditItem(map[string]interface{}{
+			"operation": "config update",
+			"artifact":  *artifact,
+			"parameter": newConfiguration.ParameterKey,
+			"value":     newConfiguration.ParameterValue,
+			"status":    status,
+			"error":     failure,
+		})
 	}
 
 	//Read configuration after change
