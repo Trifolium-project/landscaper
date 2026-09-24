@@ -131,6 +131,17 @@ func artifactDownload() {
 		for index, row := range rows {
 			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%s\t%s\n",
 				index+1, row.ArtifactId, row.PackageId, row.Version, row.Status, row.Path)
+
+			//The audit log carries the same status vocabulary as the table
+			auditItem(map[string]interface{}{
+				"operation": "download",
+				"artifact":  row.ArtifactId,
+				"package":   row.PackageId,
+				"version":   row.Version,
+				"status":    row.Status,
+				"path":      row.Path,
+				"failed":    row.Failed,
+			})
 		}
 		writer.Flush()
 	}

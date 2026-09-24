@@ -113,6 +113,18 @@ func artifactUpload(paths []string) {
 			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%t\n",
 				index+1, row.ArtifactId, row.Source, row.PackageId,
 				row.TenantVersion, row.UploadVersion, row.Action, row.Deployed)
+
+			//The audit log carries the same status vocabulary as the table
+			auditItem(map[string]interface{}{
+				"operation":      "upload",
+				"artifact":       row.ArtifactId,
+				"package":        row.PackageId,
+				"source":         row.Source,
+				"tenant_version": row.TenantVersion,
+				"version":        row.UploadVersion,
+				"status":         row.Action,
+				"deployed":       row.Deployed,
+			})
 		}
 		writer.Flush()
 	}

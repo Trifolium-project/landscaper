@@ -93,6 +93,84 @@ git push --force-with-lease origin develop
 
 Only do this once you've confirmed `develop` has nothing in it that isn't already on `main` (`git diff origin/main develop` should be empty) — otherwise you'll discard real work.
 
+## Cutting a release
+
+Merging `develop → main` is not itself a release — it just makes the code releasable. A release is a git tag plus a GitHub release carrying the cross-compiled binaries, and since there's no CI, both are created by hand with `gh`.
+
+Releases are always cut **from `main`**, after the merge above has landed.
+
+### Conventions
+
+These come from the existing releases, not from any enforcement — nothing will stop you deviating:
+
+| | Convention |
+|---|---|
+| Tag | `vX.Y.Z`, annotated, on `main` |
+| Release title | `Landscaper version X.Y.Z` |
+| Pre-release | Yes — every release so far is marked pre-release, and the tool is still pre-1.0 |
+| Asset | A single `build/landscaper.zip` holding all five binaries |
+| Notes | GitHub's auto-generated list of merged PRs (`--generate-notes`) |
+
+`0.3.0` is tagged without the `v` prefix. That's the odd one out — use `v`.
+
+**There is no version string in the source.** No constant, no `--version` flag, nothing in `go.mod` to bump. The tag is the only place the number exists, so there's no pre-tag edit to make and no risk of the binary disagreeing with the release.
+
+### Steps
+
+```bash
+git checkout main && git pull --ff-only origin main
+
+# Nothing is gated on tests, so this is the last chance to catch a break
+go build ./... && go vet ./... && go test ./packages/...
+
+git tag -a v0.6.0 -m "Landscaper version 0.6.0"
+git push origin v0.6.0
+
+# Cross-compiles windows/darwin/linux on amd64 and arm64, then zips them.
+# Must run from the repo root - the script writes to a relative build/.
+rm -rf build && ./go-executable-build.bash . archive
+
+gh release create v0.6.0 build/landscaper.zip \
+  --title "Landscaper version 0.6.0" \
+  --prerelease --generate-notes
+```
+
+`rm -rf build` is belt and braces rather than a requirement. The script archives exactly the binaries it has just built and deletes any previous `landscaper.zip` first, so a stray file left in `build/` - a `.DS_Store`, a leftover from an interrupted run - cannot reach the release, and re-running it does not accumulate entries from earlier runs. Clearing the folder anyway costs nothing and keeps the build genuinely from scratch.
+
+This was not always true: the script used to archive the whole `build/` directory, and `v0.5.0` still ships a `build/.DS_Store` as a result.
+
+### Choosing the number
+
+Semver against the previous tag, judged by what a user of the CLI sees:
+
+- **Patch** — bug fixes only, no change to commands, flags or output.
+- **Minor** — a new command or flag, or new behaviour in an existing one. This is the usual case.
+- **Major** — reserved for 1.0 and for genuinely breaking changes to the landscape file format or to existing command behaviour.
+
+### Release notes and the changelog
+
+`--generate-notes` writes the list of PRs merged since the previous tag plus a compare link. It does **not** read `changelog/`, so the design documents there never appear in the release.
+
+That's the established pattern and it's fine for a PR-level summary. If a release deserves more — a format change, a new trap users need to know about — write the notes by hand instead:
+
+```bash
+gh release create v0.6.0 build/landscaper.zip \
+  --title "Landscaper version 0.6.0" \
+  --prerelease --notes-file release-notes.md
+```
+
+### Fixing a release
+
+A tag that was pushed to the wrong commit is worth correcting immediately, before anyone fetches it, and is dangerous to correct later — anyone who already pulled keeps the old tag and will not see the replacement.
+
+```bash
+gh release delete v0.6.0 --yes
+git push origin :refs/tags/v0.6.0    # delete the remote tag
+git tag -d v0.6.0                    # and the local one
+```
+
+If the release has been out long enough that someone may have downloaded it, don't reuse the number — publish the fix as the next patch version instead.
+
 ## The one rule that prevents branch drift
 
 Always pull immediately before branching off `develop` for new work — both from `develop` itself and from `main`, in case a release merge landed there since you last synced:

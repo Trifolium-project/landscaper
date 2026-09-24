@@ -53,6 +53,7 @@ handling - manifests, versions, zip - with no cobra and no HTTP.
 | `packages/iflow/manifest.go` | Read/write `META-INF/MANIFEST.MF` |
 | `packages/iflow/version.go` | `Version`, `ParseVersion`, `Compare`, `Bump` |
 | `packages/iflow/zip.go` | `ZipDir`, `UnzipToDir`, `WriteFileAtomic`, read headers out of an archive |
+| `packages/auditlog/auditlog.go` | JSON Lines audit log of a run and of every tenant call. Pure leaf package, redaction lives here |
 | `packages/util/util.go` | `Contains` |
 | `conf/landscape*.yaml` | Landscape definitions. `landscape.yaml` is gitignored |
 | `assets/IntegrationContent.yaml` | SAP's OData swagger. **159KB - grep it, never read it whole** |
@@ -88,12 +89,14 @@ Things that are expensive to rediscover. Read these before changing anything.
 - **`root.go:115` and `root.go:120` mutate the global flags before any command runs**: `*pkg = *pkg + env.Suffix` and `*artifact = *artifact + env.Suffix`, using the suffix of `--env`. Consequences: never route a filesystem path through `--artifact`; never combine `--env` with `--target-env` or the package is suffixed twice; a new command taking paths must use positional args.
 - **The archive's `Bundle-SymbolicName` must match the OData `Id` it is uploaded under.** The tenant derives the symbolic name from the id at creation and rejects any later `PUT` whose archive disagrees ("due to change in the Bundle-symbolicName"). `artifact pack`/`upload` therefore suffix `Bundle-SymbolicName` and `Bundle-Name` **inside the archive** whenever `Environment.Suffix != ""` - never in the repository. See `changelog/0003-artifact-upload-symbolic-name.md`.
 - **`artifact download` is not the mirror of `artifact upload`.** It writes tenant ids **verbatim**, so downloading from a suffixed environment yields `artifacts/MyPackageQA/MyFlowQA/` with `Bundle-SymbolicName: MyFlowQA` left as it is. Such a folder uploads back to `QA` (via `trimTargetSuffix`) but **not** to `Dev`, and `artifact pack` needs `--skip-version-check`. See `changelog/0004-artifact-download.md`.
+- **The audit log must stay unbuffered and must never import `log`.** `--log` writes one `os.File.Write` per record because `log.Fatalln` exits through `os.Exit`, which runs no defers and flushes nothing. And the standard logger holds its mutex across the write it makes to `auditlog.LogWriter`, so logging from inside that writer deadlocks the process instead of recursing. See `changelog/0005-audit-logging.md`.
+- **Never dump an `*http.Request` or its headers.** `setAuth` populates `Authorization` before anything else in `doRequest` can see the request, and with Basic auth that header is a reversible `base64(user:password)`. The old `VerboseLog` blocks did exactly this and were removed. Route headers through `auditlog.RedactHeaders`.
 - **Only the original environment owns the version.** Uploading anywhere else takes the version from `META-INF/MANIFEST.MF` as it is, never writes the working tree, and ignores `--bump`/`--set-version`. A pipeline deploying to QA can therefore not produce a commit.
 - **`Version == "Active"`** in an API response means the artifact is a **draft** in the tenant, not a version string. `packageMove` aborts on it; `artifact pack` cannot compare it.
 - **`assets/IntegrationContent.yaml` is 159KB** (~40K tokens). Grep it for the endpoint you need.
 - **Known bug, do not copy**: `packageMove.go:250-256` has inverted branches and nil-derefs `sourceConf.DataType` when the source artifact lacks a parameter. The surrounding `defer recover()` hides it. `artifactUpload.go` deliberately does not reuse that loop.
 - **Do not run `gofmt -w`.** The repo is formatted with go1.17 gofmt. Modern gofmt rewrites comment spacing and license-block indentation in *every* file - `gofmt -l packages/` listing all of them is expected, not a problem to fix.
-- **Gitignored**: `.env`, `conf/landscape.yaml`, `artifacts/`, `build/`, `landscaper`. Edits under `artifacts/` cannot be undone with git - back the folder up before changing a manifest.
+- **Gitignored**: `.env`, `conf/landscape.yaml`, `artifacts/`, `build/`, `logs/`, `landscaper`. `logs/` holds complete tenant responses, so it must stay ignored. Edits under `artifacts/` cannot be undone with git - back the folder up before changing a manifest.
 - Credentials: `landscape.yaml` stores the *names* of environment variables, resolved with `os.Getenv` from `.env`. An empty login or password triggers an interactive prompt (`landscape.go`), which will hang a pipeline.
 - `GetArtifactConfiguration` uses `defer recover()` instead of nil checks and returns `nil, nil` when the package, artifact or environment is missing.
 

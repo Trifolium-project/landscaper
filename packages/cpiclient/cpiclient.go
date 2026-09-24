@@ -28,6 +28,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptrace"
 
+	"github.com/Trifolium-project/landscaper/packages/auditlog"
 	"golang.org/x/oauth2/clientcredentials"
 )
 
@@ -44,6 +45,8 @@ type CPIClient struct {
 	clientTrace *httptrace.ClientTrace
 	traceCtx    context.Context
 	VerboseLog  bool
+	//Audit log of every call to the tenant. A nil Logger records nothing.
+	Logger *auditlog.Logger
 }
 
 type IntegrationPackage struct {
@@ -163,17 +166,25 @@ func NewCPIBasicAuthClient(username, password, tokenURL, url string, verbose boo
 
 
 
+//SetLogger attaches an audit log to every call this client makes. Passing nil
+//turns recording off, which is the default.
+func (s *CPIClient) SetLogger(logger *auditlog.Logger) {
+	s.Logger = logger
+}
+
 func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 
 	s.setAuth(req)
 
-	if s.VerboseLog {
-		log.Println(req)
-		log.Printf("\n\n")
-	}
+	//Recorded from a defer, so the call still reaches the audit log when a
+	//later line exits through log.Fatal or panics
+	call := s.Logger.StartHTTP(req)
+	defer call.Flush()
+
 	resp, err := s.Client.Do(req)
 
 	if err != nil {
+		call.SetError(err)
 		log.Printf("HTTP request error: %s", err)
 		return nil, nil, err
 	}
@@ -183,17 +194,18 @@ func (s *CPIClient) doRequest(req *http.Request) ([]byte, http.Header, error) {
 	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
+		call.SetError(err)
 		return nil, nil, err
 	}
+
+	//The status code is not carried by the error returned below, so the audit
+	//record is the only place it survives
+	call.SetResponse(resp.StatusCode, resp.Header, body)
 
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 		log.Fatal(err)
 	}
 	resp.Body.Close()
-	if s.VerboseLog {
-		log.Printf("Response: %v", resp)
-		log.Printf("\n\n")
-	}
 
 	var httpCodeGroup int
 	for httpCodeGroup = resp.StatusCode; httpCodeGroup >= 10; httpCodeGroup = httpCodeGroup / 10 {
