@@ -62,6 +62,16 @@ type Artifact struct {
 	Id             string
 	Template       string
 	Configurations map[string]*Configuration
+	//Design guidelines, that are skipped on purpose. Applied by
+	//"artifact guidelines run" and "artifact upload --apply-guideline-skips".
+	GuidelineSkips []*GuidelineSkip
+}
+
+//GuidelineSkip is a design guideline rule, that an artifact does not follow on
+//purpose, together with the reason the tenant records for it
+type GuidelineSkip struct {
+	Rule   string
+	Reason string
 }
 
 type Configuration struct {
@@ -99,6 +109,10 @@ type LandscapeYAML struct {
 						Type  string
 					}
 				}
+				GuidelineSkips []struct {
+					Rule   string
+					Reason string
+				} `yaml:"guidelineSkips"`
 			}
 		}
 		Environments []struct {
@@ -183,6 +197,45 @@ func (landscape *Landscape) FindPackageForArtifact(artifact string) (string, err
 		return matches[0], nil
 	default:
 		return "", fmt.Errorf("Artifact %s is declared in several packages (%s), use --pkg to select one", artifact, strings.Join(matches, ", "))
+	}
+}
+
+//GetGuidelineSkips returns the design guideline skips declared for an artifact,
+//given by its id without environment suffix. An artifact declared in several
+//packages gets the skips of all of them.
+func (landscape *Landscape) GetGuidelineSkips(artifact string) []*GuidelineSkip {
+
+	packageIds := []string{}
+	for packageId := range landscape.Packages {
+		packageIds = append(packageIds, packageId)
+	}
+	sort.Strings(packageIds)
+
+	skips := []*GuidelineSkip{}
+	for _, packageId := range packageIds {
+		if declared, found := landscape.Packages[packageId].Artifacts[artifact]; found {
+			skips = append(skips, declared.GuidelineSkips...)
+		}
+	}
+
+	return skips
+}
+
+//CarryOverGuidelineSkips copies the declared guideline skips into packages read
+//back from a tenant, which cannot know them, so that regenerating the packages
+//section does not drop them
+func (landscape *Landscape) CarryOverGuidelineSkips(packages map[string]*Package) {
+
+	for packageId, package_ := range packages {
+		declaredPackage := landscape.Packages[packageId]
+		if declaredPackage == nil {
+			continue
+		}
+		for artifactId, artifact := range package_.Artifacts {
+			if declared := declaredPackage.Artifacts[artifactId]; declared != nil && len(artifact.GuidelineSkips) == 0 {
+				artifact.GuidelineSkips = declared.GuidelineSkips
+			}
+		}
 	}
 }
 
@@ -332,10 +385,26 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 
 			}
 
+			guidelineSkips := []*GuidelineSkip{}
+			for _, skipYAML := range artifactYAML.GuidelineSkips {
+				if strings.TrimSpace(skipYAML.Rule) == "" {
+					return nil, fmt.Errorf("A guidelineSkips entry of artifact %s has no rule", artifactYAML.Id)
+				}
+				//The tenant refuses a skip without a reason
+				if strings.TrimSpace(skipYAML.Reason) == "" {
+					return nil, fmt.Errorf("Guideline skip %s of artifact %s has no reason", skipYAML.Rule, artifactYAML.Id)
+				}
+				guidelineSkips = append(guidelineSkips, &GuidelineSkip{
+					Rule:   strings.TrimSpace(skipYAML.Rule),
+					Reason: strings.TrimSpace(skipYAML.Reason),
+				})
+			}
+
 			artifact := &Artifact{
 				Id:             artifactYAML.Id,
 				Template:       artifactYAML.Template,
 				Configurations: configurations,
+				GuidelineSkips: guidelineSkips,
 			}
 
 			artifacts[artifactYAML.Id] = artifact

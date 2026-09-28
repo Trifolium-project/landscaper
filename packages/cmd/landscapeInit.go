@@ -101,6 +101,9 @@ func landscapeInit() {
 		log.Println(warning)
 	}
 
+	//The tenant knows nothing about declared guideline skips
+	globalLandscape.CarryOverGuidelineSkips(packages)
+
 	err = globalLandscape.WritePackages(sourceFile, targetFile, packages)
 	if err != nil {
 		log.Fatalln(err)

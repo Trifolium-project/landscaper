@@ -446,6 +446,155 @@ the **previous** version as `STARTED` for a while. `--wait` therefore only
 accepts a runtime status whose version matches the one just uploaded, so a
 success is never reported for a deployment that has not happened yet.
 
+### Checking design guidelines
+
+SAP Cloud Integration ships a static analysis of integration flows, the
+[design guidelines](https://help.sap.com/docs/integration-suite/sap-integration-suite/design-guidelines):
+around forty rules on exception handling, streaming, security and scripting,
+each with a severity. `artifact guidelines` runs them through the API, reports
+the result per rule, and skips rules an artifact does not follow on purpose.
+The guidelines have to be activated for the tenant by an administrator.
+
+```bash
+#Run the guidelines and report the result
+landscaper artifact guidelines run --env Dev --artifacts Order_API_TEST_HARNESS,GENAI_OrderQuote
+
+#Read the latest result without running again
+landscaper artifact guidelines results --env Dev --packages TestHarnessPreparation
+
+#Every artifact of the landscape configuration, failing only on High rules
+landscaper artifact guidelines run --env Dev --all-declared --fail-on high --output json
+```
+
+Exactly one of `--artifacts`, `--packages` and `--all-declared` selects what to
+check. Ids are given without the environment suffix, which the command appends.
+`--packages` reads the package from the tenant, so artifacts not declared in the
+landscape configuration are checked too.
+
+```
+#  ArtefactId              Package                 Version  Status         Not compliant  Skipped  Violations  Declared skips  Error
+1  Order_API_TEST_HARNESS  TestHarnessPreparation  1.0.18   not-compliant  6              1        6           1/1
+
+===Order_API_TEST_HARNESS===
+#  Rule                                                 Severity  Status         Elements                         Detail
+1  STREAM_THE_XML_SLURPER_INPUT_IN_GROOVY_SCRIPTS       High      not-compliant  CallActivity_59,CallActivity_75  You have configured the script to parse the message body using XMLSlurper without streaming
+2  HANDLE_EXCEPTIONS                                    High      not-compliant  Process_1                        You have configured the artifact without an exception subprocess
+3  CONTINUE_MESSAGE_PROCESSING_EVEN_AFTER_AN_EXCEPTION  Low       skipped        Process_54,Process_70            Skipped: Errors are handled by the caller
+...
+===Summary===
+Environment:                  Dev
+Artifacts:                    1
+Compliant:                    0
+Not compliant:                1
+Not finished:                 0
+Errors:                       0
+Violations (--fail-on low):   6
+```
+
+The text output lists only the rules that need attention. `--output json`
+carries every rule, compliant and not applicable ones included:
+
+```json
+{
+  "environment": "Dev",
+  "failOn": "low",
+  "summary": {"artifacts": 1, "compliant": 0, "notCompliant": 1, "notFinished": 0, "errors": 0, "violations": 6},
+  "artifacts": [{
+    "id": "Order_API_TEST_HARNESS",
+    "package": "TestHarnessPreparation",
+    "version": "1.0.18",
+    "executionId": "1fb1f92a45e04c5696efc7121ce91062",
+    "executionStatus": "FAIL",
+    "executionTime": "2026-09-28T07:41:47Z",
+    "status": "not-compliant",
+    "violations": 6,
+    "counts": {"compliant": 19, "not-applicable": 13, "not-compliant": 6, "skipped": 1},
+    "declaredSkips": {"declared": 1, "applied": 1, "failures": []},
+    "rules": [{
+      "id": "STREAM_THE_XML_SLURPER_INPUT_IN_GROOVY_SCRIPTS",
+      "name": "Use of XMLSlurper",
+      "category": "Scripting Guidelines",
+      "severity": "High",
+      "applicability": "Applicable",
+      "compliance": "Non-Compliant",
+      "status": "not-compliant",
+      "skipped": false,
+      "skipReason": "",
+      "skippedBy": "",
+      "expected": "Stream the message body to the XMLSlurper by using message.getBody(java.io.Reader.class) ...",
+      "actual": "You have configured the script to parse the message body using XMLSlurper without streaming",
+      "violatedComponents": [
+        {"id": "CallActivity_59", "name": "Build Response"},
+        {"id": "CallActivity_75", "name": "Build Delete Response"}
+      ],
+      "violatedComponentsRaw": "{CallActivity_59=Build Response, CallActivity_75=Build Delete Response}"
+    }]
+  }]
+}
+```
+
+A rule's `status` is one of `compliant`, `not-compliant`, `not-applicable` or
+`skipped`. An artifact's is `compliant`, `not-compliant`, `not-executed` (never
+checked, only from `results`), `not-finished` or `error`. `violatedComponents`
+are the ids of the model elements, as the `.iflw` file names them.
+
+#### Exit codes of run and results
+
+| Code | Meaning |
+|---|---|
+| `0` | Nothing at or above `--fail-on` is violated |
+| `7` | A rule at or above `--fail-on` is not compliant and not skipped |
+| `3` | An execution did not finish, or an artifact was never checked |
+| `1` | Anything else went wrong, e.g. an artifact that does not exist |
+
+`--fail-on` takes `low` (the default, any violation fails), `medium`, `high` or
+`none`. An artifact that fails does not stop a batch: it is reported with its
+error and the others are still checked.
+
+#### Skipping rules
+
+```bash
+landscaper artifact guidelines skip --env Dev --artifacts Order_API_TEST_HARNESS \
+  --rule CONTINUE_MESSAGE_PROCESSING_EVEN_AFTER_AN_EXCEPTION --reason "Errors are handled by the caller"
+landscaper artifact guidelines unskip --env Dev --artifacts Order_API_TEST_HARNESS \
+  --rule CONTINUE_MESSAGE_PROCESSING_EVEN_AFTER_AN_EXCEPTION
+```
+
+The tenant records the reason and who skipped, and keeps the skip for later
+executions. Both commands are safe to repeat: they report `unchanged` when the
+tenant already holds the requested state, and `updated` when an existing skip
+gets a new reason. Some rules are essential and cannot be skipped at all.
+
+To keep exceptions in git, declare them in the landscape configuration instead:
+
+```yaml
+packages:
+  - id: TestHarnessPreparation
+    artifacts:
+      - id: Order_API_TEST_HARNESS
+        guidelineSkips:
+          - rule: CONTINUE_MESSAGE_PROCESSING_EVEN_AFTER_AN_EXCEPTION
+            reason: Errors are handled by the caller
+```
+
+`artifact guidelines run` applies them to every execution (`--no-declared-skips`
+turns that off), and `artifact upload --apply-guideline-skips` applies them after
+the upload and the configuration, before `--deploy`, with an extra
+`Guideline Skips` column in the table. A declared reason replaces one filed by
+hand. A skip the tenant refuses - an unknown or essential rule - is reported and
+does not fail the command. `init` keeps the declared skips when it regenerates
+the `packages:` section.
+
+#### The rule catalogue
+
+```bash
+landscaper artifact guidelines rules --env Dev --artifacts Order_API_TEST_HARNESS --output json
+```
+
+lists id, name, category and severity of every activated rule. The API offers
+no catalogue of its own, so the list is taken from an execution of the given
+artifacts, which is run first when there is none.
+
 ### Audit log
 
 Every command can record what it did. Logging is **off by default** and enabled
@@ -610,6 +759,10 @@ Now, only integration flows are supported, but it is also planned to add other o
 
 
 You need to add artifact information, if it is necessary to maintain different configuration for each environment. For example, you may need to maintain different endpoints to external systems and credential aliases for each environment. Keep in mind, that all configuration parameters, that are not mentioned in landscape.yaml file, value from original environment will be copied. This means, that you can omit all parameters, that are not changing between environments, in landscape.yaml. This will help to keep configuration file clean.
+
+An artifact may also list `guidelineSkips`, design guideline rules it does not
+follow on purpose, each with a `rule` and a mandatory `reason`. See
+[Checking design guidelines](#checking-design-guidelines).
 
 #### **Gathering the landscape definition automatically**
 
