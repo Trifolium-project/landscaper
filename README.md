@@ -17,9 +17,10 @@ Below you can find zoomed example of CPI landscape. It can contain multiple "env
 
 0. Install landscaper
 
-Every release ships one asset, `landscaper.zip`, holding a static binary for each
-platform. There is nothing to compile and no runtime to install - pick your
-binary out of the archive, make it executable and put it on your `PATH`.
+Every [release](https://github.com/Trifolium-project/landscaper/releases) ships
+one asset, `landscaper.zip`, holding a static binary for each platform. There is
+nothing to compile and no runtime to install - pick your binary out of the
+archive, make it executable and put it on your `PATH`.
 
 | Platform | Binary in the archive |
 |---|---|
@@ -34,15 +35,17 @@ ARM build, `x86_64` means the amd64 one.
 
 **Releases are marked as pre-release, so there is no "latest" download URL** -
 `/releases/latest/download/...` returns 404. Install a version by name, or let
-the commands below look the newest one up.
+the commands below look the newest one up. They read the releases feed rather
+than the GitHub API, whose limit of 60 anonymous requests per hour is quickly
+used up behind a shared company IP.
 
 <details open>
 <summary><b>macOS</b></summary>
 
 ```bash
 # Newest release, Apple Silicon. Use landscaper-darwin-amd64 on an Intel Mac.
-VERSION=$(curl -s https://api.github.com/repos/Trifolium-project/landscaper/releases | grep -m1 '"tag_name"' | cut -d'"' -f4)
-curl -L -o landscaper.zip "https://github.com/Trifolium-project/landscaper/releases/download/$VERSION/landscaper.zip"
+VERSION=$(curl -fsSL https://github.com/Trifolium-project/landscaper/releases.atom | grep -o 'releases/tag/[^"]*' | head -1 | cut -d/ -f3)
+curl -fL -o landscaper.zip "https://github.com/Trifolium-project/landscaper/releases/download/${VERSION:?release lookup failed}/landscaper.zip"
 
 unzip -o landscaper.zip
 sudo install -m 755 build/landscaper-darwin-arm64 /usr/local/bin/landscaper
@@ -68,8 +71,8 @@ Downloading with `curl`, as above, does not set that flag in the first place.
 
 ```bash
 # Newest release, x86-64. Use landscaper-linux-arm64 on ARM.
-VERSION=$(curl -s https://api.github.com/repos/Trifolium-project/landscaper/releases | grep -m1 '"tag_name"' | cut -d'"' -f4)
-curl -L -o landscaper.zip "https://github.com/Trifolium-project/landscaper/releases/download/$VERSION/landscaper.zip"
+VERSION=$(curl -fsSL https://github.com/Trifolium-project/landscaper/releases.atom | grep -o 'releases/tag/[^"]*' | head -1 | cut -d/ -f3)
+curl -fL -o landscaper.zip "https://github.com/Trifolium-project/landscaper/releases/download/${VERSION:?release lookup failed}/landscaper.zip"
 
 unzip -o landscaper.zip
 sudo install -m 755 build/landscaper-linux-amd64 /usr/local/bin/landscaper
@@ -92,8 +95,9 @@ export PATH="$HOME/.local/bin:$PATH"   # add to ~/.bashrc to make it permanent
 
 ```powershell
 # Newest release
-$version = (Invoke-RestMethod https://api.github.com/repos/Trifolium-project/landscaper/releases)[0].tag_name
-Invoke-WebRequest "https://github.com/Trifolium-project/landscaper/releases/download/$version/landscaper.zip" -OutFile landscaper.zip
+$feed = [xml](Invoke-WebRequest -UseBasicParsing https://github.com/Trifolium-project/landscaper/releases.atom).Content
+$version = @($feed.feed.entry)[0].link.href.Split('/')[-1]
+Invoke-WebRequest -UseBasicParsing "https://github.com/Trifolium-project/landscaper/releases/download/$version/landscaper.zip" -OutFile landscaper.zip
 
 Expand-Archive landscaper.zip -DestinationPath . -Force
 New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Programs\landscaper" | Out-Null
@@ -112,11 +116,18 @@ landscaper --help
 </details>
 
 Installing a **specific version** is the same commands with the lookup replaced
-by the tag you want:
+by the tag you want, as listed on the
+[releases page](https://github.com/Trifolium-project/landscaper/releases):
 
 ```bash
-curl -L -o landscaper.zip https://github.com/Trifolium-project/landscaper/releases/download/v0.6.0/landscaper.zip
+curl -fL -o landscaper.zip https://github.com/Trifolium-project/landscaper/releases/download/v0.8.0/landscaper.zip
 ```
+
+If `unzip` fails with *"End-of-central-directory signature not found"*, the file
+is not the archive but an error page saved under its name - check with
+`ls -l landscaper.zip` (the archive is about 44 MB) and `head -c 100 landscaper.zip`.
+The usual cause is a `/releases/latest/...` URL or an empty version from a failed
+lookup; `curl -f`, as above, fails instead of saving the page.
 
 `landscaper` has no self-update and no `--version` flag; to upgrade, repeat the
 install and overwrite the binary. To uninstall, delete it - the tool writes
