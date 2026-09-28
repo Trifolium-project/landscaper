@@ -4,7 +4,9 @@ SAP Cloud Integration OData client. Most of it lives in `cpiclient.go` (~900
 lines); `parse.go` holds null-safe JSON helpers; `errorinformation.go` reads why
 a deployment failed; `guidelines.go` holds the design guideline calls, whose
 tenant behaviour differs from SAP's swagger (see the root Traps and
-`changelog/0007-design-guidelines.md`); `artifact.go` is an empty stub.
+`changelog/0007-design-guidelines.md`); `packages.go` holds copy, delete, the
+artifact types of a package and the runtime list, and returns `*StatusError`
+so callers can use `HasStatus(err, 404)`; `artifact.go` is an empty stub.
 
 `const apiVersion = "v1"`. `CPIClient.URL` is the **host only** - every call
 builds `"https://" + s.URL + "/api/" + apiVersion + "/" + <entity>`.

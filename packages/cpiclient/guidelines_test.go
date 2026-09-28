@@ -60,7 +60,7 @@ func TestParseExecutionId(t *testing.T) {
 	}
 }
 
-func TestGuidelineError(t *testing.T) {
+func TestODataError(t *testing.T) {
 
 	tests := []struct {
 		name string
@@ -76,7 +76,7 @@ func TestGuidelineError(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := guidelineError(fmt.Errorf("%s", test.body)).Error(); got != test.want {
+			if got := odataError(fmt.Errorf("%s", test.body)).Error(); got != test.want {
 				t.Errorf("got %q, want %q", got, test.want)
 			}
 		})

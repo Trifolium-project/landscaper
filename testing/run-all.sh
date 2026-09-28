@@ -20,7 +20,7 @@ for arg in "$@"; do
 done
 
 LOCAL_SCRIPTS=(00-unit-tests.sh 01-pack-local.sh 03-multi-artifact.sh 08-upload-errors.sh 11-logging.sh)
-TENANT_SCRIPTS=(02-version-rules.sh 04-upload-target-env.sh 05-upload-original-env.sh 06-zip-input.sh 07-deploy.sh 10-download.sh 12-deploy-status.sh 13-design-guidelines.sh)
+TENANT_SCRIPTS=(02-version-rules.sh 04-upload-target-env.sh 05-upload-original-env.sh 06-zip-input.sh 07-deploy.sh 10-download.sh 12-deploy-status.sh 13-design-guidelines.sh 14-package-copy-delete.sh)
 
 SCRIPTS=("${LOCAL_SCRIPTS[@]}")
 if [ "$WITH_TENANT" = "1" ]; then
@@ -28,7 +28,7 @@ if [ "$WITH_TENANT" = "1" ]; then
     SCRIPTS=(00-unit-tests.sh 01-pack-local.sh 02-version-rules.sh 03-multi-artifact.sh
              04-upload-target-env.sh 05-upload-original-env.sh 06-zip-input.sh
              07-deploy.sh 08-upload-errors.sh 10-download.sh 11-logging.sh 12-deploy-status.sh
-             13-design-guidelines.sh)
+             13-design-guidelines.sh 14-package-copy-delete.sh)
 fi
 
 FAILED_SCRIPTS=()

@@ -465,6 +465,144 @@ paths:
                 message:
                   lang: en
                   value: Requested entity could not be found.
+  #Message mapping and script collection listings of a package, taken from the
+  #current Business Accelerator Hub spec for "package delete". Observed on a
+  #tenant (2026-09): DELETE IntegrationPackages answers 202 and deletes in the
+  #background, and it deletes a package with deployed content, leaving that
+  #content running. See changelog/0008-package-copy-delete.md.
+  /IntegrationPackages('{Id}')/MessageMappingDesigntimeArtifacts:
+    get:
+      description: You can use the following request to get all message mappings of an integration package by package Id.
+      summary: Get all message mappings of an integration package.
+      tags: [Integration Packages - Design]
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          ID of integration package <br>
+          Example: ```MessageMappingExamples```
+        type: string
+      - name: $select
+        in: query
+        description: Select properties to be returned.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum: [Id, Version, PackageId, Name, Description, ArtifactContent]
+      responses:
+        '200':
+          description: Retrieved message mappings of the integration package
+          schema:
+            title: Collection of message mappings with same integration package ID
+            type: object
+            properties:
+              value:
+                type: array
+                items: {$ref: '#/definitions/com.sap.hci.api.MessageMappingDesigntimeArtifact'}
+          examples:
+            application/json:
+              d:
+                results:
+                - Id: MessageMapping1
+                  Version: 1.0.0
+                  PackageId: MessageMappingExamples
+                  Name: MessageMapping1
+                  Description: A
+                  ArtifactContent: null
+                  Resources: {}
+                - Id: MessageMapping2
+                  Version: 8.1.0
+                  PackageId: MessageMappingExamples
+                  Name: MessageMapping2
+                  Description: ''
+                  ArtifactContent: null
+                  Resources: {}
+        '400': {$ref: '#/responses/400'}
+        '401': {$ref: '#/responses/401'}
+        '403': {$ref: '#/responses/403'}
+        '404': {$ref: '#/responses/404'}
+        '429': {$ref: '#/responses/429'}
+        default: {$ref: '#/responses/error'}
+  /IntegrationPackages('{Id}')/ScriptCollectionDesigntimeArtifacts:
+    get:
+      description: You can use the following request to get all script collections of an integration package by package Id.
+      summary: Get all script collections of a package.
+      tags: [Integration Packages - Design]
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration package <br>
+          Example: ```packageName```
+        type: string
+      responses:
+        '200':
+          description: Retrieved script collections of the integration package
+          schema:
+            title: Set of script collections with same integration package Id
+            type: object
+            properties:
+              value:
+                type: array
+                items: {$ref: '#/definitions/com.sap.hci.api.ScriptCollectionDesigntimeArtifact'}
+          examples:
+            application/json:
+              d:
+                results:
+                - {Id: ScriptCollectionArtifact1, Version: 2.0.0, PackageId: packageName, Name: ScriptCollectionArtifact1, Description: Script Collection for test, ArtifactContent: null}
+                - {Id: ScriptCollectionArtifact2, Version: 2.0.0, PackageId: packageName, Name: ScriptCollectionArtifact2, Description: Script Collection for test, ArtifactContent: null}
+        '400': {$ref: '#/responses/400'}
+        '401': {$ref: '#/responses/401'}
+        '403': {$ref: '#/responses/403'}
+        '404': {$ref: '#/responses/404'}
+        '429': {$ref: '#/responses/429'}
+        default: {$ref: '#/responses/error'}
+  ? /IntegrationPackages('{Id}')/ScriptCollectionDesigntimeArtifacts(Id='{ScriptCollectionArtifactID}',Version='{ArtifactVersion}')
+  : get:
+      description: You can use the following request to get script collection of an integration package by package Id, script collection Id and script collection version.
+      summary: Get a script collection of a package.
+      tags: [Integration Packages - Design]
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration package <br>
+          Example: ```packageName```
+        type: string
+      - name: ArtifactId
+        in: path
+        required: true
+        description: |-
+          Id of script collection <br>
+          Example: ```ScriptCollectionArtifactID```
+        type: string
+      - name: ArtifactVersion
+        in: path
+        required: true
+        description: |-
+          Version of script collection <br>
+          You can enter either ```active``` or the version name (e.g. ```2.0.0```) for retrieving the current version.
+        type: string
+        default: active
+      responses:
+        '200':
+          description: Retrieved script collection
+          schema: {$ref: '#/definitions/com.sap.hci.api.ScriptCollectionDesigntimeArtifact'}
+          examples:
+            application/json:
+              d:
+                results:
+                - {Id: ScriptCollectionArtifactID, Version: 2.0.0, PackageId: packageName, Name: ScriptCollectionArtifactID, Description: Script Collection for test, ArtifactContent: null}
+        '400': {$ref: '#/responses/400'}
+        '401': {$ref: '#/responses/401'}
+        '403': {$ref: '#/responses/403'}
+        '404': {$ref: '#/responses/404'}
+        '429': {$ref: '#/responses/429'}
+        default: {$ref: '#/responses/error'}
   /IntegrationPackages('{Id}')/IntegrationDesigntimeArtifacts:
     get:
       description: You can use the following request to get all integration flows of a designtime integration package by package Id.
@@ -4455,6 +4593,61 @@ definitions:
       ViolatedComponents:
         type: [string, 'null']
     title: DesignGuideline
+  com.sap.hci.api.MessageMappingDesigntimeArtifact:
+    type: object
+    properties:
+      Id:
+        type: [string, 'null']
+      Version:
+        type: [string, 'null']
+      PackageId:
+        type: [string, 'null']
+      Name:
+        type: [string, 'null']
+      Description:
+        type: [string, 'null']
+      ArtifactContent:
+        type: [string, 'null']
+        format: base64url
+      Resources:
+        title: Collection of Resource
+        type: object
+        properties:
+          results:
+            type: array
+            items: {$ref: '#/definitions/com.sap.hci.api.Resource'}
+    title: MessageMappingDesigntimeArtifact
+  com.sap.hci.api.ScriptCollectionDesigntimeArtifact:
+    type: object
+    properties:
+      Id:
+        type: [string, 'null']
+      Version:
+        type: [string, 'null']
+      PackageId:
+        type: [string, 'null']
+      Name:
+        type: [string, 'null']
+      Description:
+        type: [string, 'null']
+      ArtifactContent:
+        type: [string, 'null']
+        format: base64url
+      Resources:
+        title: Collection of Resource
+        type: object
+        properties:
+          results:
+            type: array
+            items: {$ref: '#/definitions/com.sap.hci.api.Resource'}
+      DesignGuidelineExecutionResults:
+        title: Collection of DesignGuidelineExecutionResult
+        type: object
+        properties:
+          results:
+            type: array
+            items: {$ref: '#/definitions/com.sap.hci.api.DesignGuidelineExecutionResult'}
+    title: ScriptCollectionDesigntimeArtifact
 parameters:
   top:
     name: $top
