@@ -41,6 +41,7 @@ var (
 	uploadWait             *bool
 	uploadTimeout          *time.Duration
 	uploadInterval         *time.Duration
+	uploadApplySkips       *bool
 )
 
 //uploadRow is a single line of the report printed at the end of the run
@@ -54,6 +55,8 @@ type uploadRow struct {
 	Deployed      bool
 	//Set only when --wait was given alongside --deploy
 	Status *deployStatus
+	//Set only with --apply-guideline-skips, for an artifact that declares skips
+	GuidelineSkips *declaredSkipsReport
 }
 
 // uploadCmd represents the artifact upload command
@@ -71,7 +74,12 @@ the artifact id and name, receives the suffix of the target environment. The
 package is created when it does not exist yet. Configuration parameters
 declared for the target environment are applied after the upload.
 
-Use --deploy to deploy the artifacts once they are uploaded.`,
+Use --deploy to deploy the artifacts once they are uploaded.
+
+--apply-guideline-skips runs the design guidelines on every artifact that
+declares guidelineSkips in the landscape configuration and files those skips,
+after the configuration and before the deployment. A skip the tenant refuses
+is reported, it does not stop the upload.`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("Uploading %d artifact(s) to %s...\n", len(args), *uploadTargetEnv)
@@ -91,6 +99,7 @@ func init() {
 	uploadWait = artifactUploadCmd.Flags().Bool("wait", false, "With --deploy, wait until each deployment is finished and report the result")
 	uploadTimeout = artifactUploadCmd.Flags().Duration("timeout", defaultDeployTimeout, "How long to wait for a deployment")
 	uploadInterval = artifactUploadCmd.Flags().Duration("interval", defaultDeployInterval, "How often to ask the tenant while waiting")
+	uploadApplySkips = artifactUploadCmd.Flags().Bool("apply-guideline-skips", false, "Apply the guidelineSkips of the landscape configuration before deploying")
 
 	artifactUploadCmd.MarkFlagRequired("target-env")
 }
@@ -113,39 +122,49 @@ func artifactUpload(paths []string) {
 	)
 
 	waiting := uploadWait != nil && *uploadWait && *uploadDeploy
+	applyingSkips := uploadApplySkips != nil && *uploadApplySkips
 
 	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
+	skipsHeader := ""
+	if applyingSkips {
+		skipsHeader = "\tGuideline Skips"
+	}
 	if waiting {
-		fmt.Fprintf(writer, "#\tArtefactId\tSource\tPackage\tVersion in %s\tUploaded Version\tAction\tDeployed\tRuntime Status\tError\n", targetEnvironment.Id)
+		fmt.Fprintf(writer, "#\tArtefactId\tSource\tPackage\tVersion in %s\tUploaded Version\tAction\tDeployed%s\tRuntime Status\tError\n", targetEnvironment.Id, skipsHeader)
 	} else {
-		fmt.Fprintf(writer, "#\tArtefactId\tSource\tPackage\tVersion in %s\tUploaded Version\tAction\tDeployed\n", targetEnvironment.Id)
+		fmt.Fprintf(writer, "#\tArtefactId\tSource\tPackage\tVersion in %s\tUploaded Version\tAction\tDeployed%s\n", targetEnvironment.Id, skipsHeader)
 	}
 
 	rows := make([]*uploadRow, 0, len(paths))
 
 	flush := func() {
 		for index, row := range rows {
+			skipsColumn := ""
+			if applyingSkips {
+				skipsColumn = "\t" + describeGuidelineSkips(row.GuidelineSkips)
+			}
 			if waiting {
-				fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%t\t%s\t%s\n",
+				fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%t%s\t%s\t%s\n",
 					index+1, row.ArtifactId, row.Source, row.PackageId,
-					row.TenantVersion, row.UploadVersion, row.Action, row.Deployed,
+					row.TenantVersion, row.UploadVersion, row.Action, row.Deployed, skipsColumn,
 					row.Status.Summary(), deployStatusError(row.Status))
 			} else {
-				fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%t\n",
+				fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%t%s\n",
 					index+1, row.ArtifactId, row.Source, row.PackageId,
-					row.TenantVersion, row.UploadVersion, row.Action, row.Deployed)
+					row.TenantVersion, row.UploadVersion, row.Action, row.Deployed, skipsColumn)
 			}
 
 			//The audit log carries the same status vocabulary as the table
 			auditItem(map[string]interface{}{
-				"operation":      "upload",
-				"artifact":       row.ArtifactId,
-				"package":        row.PackageId,
-				"source":         row.Source,
-				"tenant_version": row.TenantVersion,
-				"version":        row.UploadVersion,
-				"status":         row.Action,
-				"deployed":       row.Deployed,
+				"operation":       "upload",
+				"artifact":        row.ArtifactId,
+				"package":         row.PackageId,
+				"source":          row.Source,
+				"tenant_version":  row.TenantVersion,
+				"version":         row.UploadVersion,
+				"status":          row.Action,
+				"deployed":        row.Deployed,
+				"guideline_skips": describeGuidelineSkips(row.GuidelineSkips),
 			})
 		}
 		writer.Flush()
@@ -318,6 +337,15 @@ func uploadArtifact(path string, targetEnvironment *landscape.Environment) (*upl
 
 	if err := applyArtifactConfiguration(targetEnvironment, basePackageId, baseArtifactId, targetArtifactId, row.UploadVersion); err != nil {
 		return nil, err
+	}
+
+	if uploadApplySkips != nil && *uploadApplySkips {
+		row.GuidelineSkips = applyUploadGuidelineSkips(client, &guidelineTarget{
+			BaseId:     baseArtifactId,
+			ArtifactId: targetArtifactId,
+			PackageId:  targetPackageId,
+			Skips:      globalLandscape.GetGuidelineSkips(baseArtifactId),
+		})
 	}
 
 	if *uploadDeploy {

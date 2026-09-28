@@ -40,6 +40,12 @@ type artifactExport struct {
 	Id             string                `yaml:"id"`
 	Template       string                `yaml:"template,omitempty"`
 	Configurations []configurationExport `yaml:"configurations,omitempty"`
+	GuidelineSkips []guidelineSkipExport `yaml:"guidelineSkips,omitempty"`
+}
+
+type guidelineSkipExport struct {
+	Rule   string `yaml:"rule"`
+	Reason string `yaml:"reason"`
 }
 
 type configurationExport struct {
@@ -185,10 +191,19 @@ func (landscape *Landscape) buildPackageExport(packages map[string]*Package) []p
 				})
 			}
 
+			guidelineSkipExports := []guidelineSkipExport{}
+			for _, skip := range artifact.GuidelineSkips {
+				guidelineSkipExports = append(guidelineSkipExports, guidelineSkipExport{
+					Rule:   skip.Rule,
+					Reason: skip.Reason,
+				})
+			}
+
 			artifactExports = append(artifactExports, artifactExport{
 				Id:             artifact.Id,
 				Template:       artifact.Template,
 				Configurations: configurationExports,
+				GuidelineSkips: guidelineSkipExports,
 			})
 		}
 

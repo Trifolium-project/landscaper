@@ -53,7 +53,9 @@ type stubTenant struct {
 	PackageModes map[string]string
 	//Artifact ids, whose download fails
 	FailingDownloads map[string]bool
-	Calls            []tenantCall
+	//Design guideline state, nil until a guideline test sets it up
+	Guidelines *stubGuidelines
+	Calls      []tenantCall
 }
 
 func newStubTenant(t *testing.T) *stubTenant {
@@ -108,6 +110,11 @@ func (tenant *stubTenant) handle(writer http.ResponseWriter, request *http.Reque
 	if request.Header.Get("X-CSRF-Token") == "Fetch" {
 		writer.Header().Set("X-CSRF-Token", "stub-token")
 		writer.Write([]byte("{}"))
+		return
+	}
+
+	//Design guideline calls, see artifactGuidelines_test.go
+	if tenant.handleGuidelines(writer, request) {
 		return
 	}
 
