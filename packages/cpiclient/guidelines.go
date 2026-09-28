@@ -127,7 +127,7 @@ func (s *CPIClient) ExecuteIntegrationDesigntimeArtifactGuidelines(ArtifactId st
 
 	body, _, err := s.doRequest(req)
 	if err != nil {
-		return "", guidelineError(err)
+		return "", odataError(err)
 	}
 
 	return parseExecutionId(body)
@@ -176,7 +176,7 @@ func (s *CPIClient) ReadDesignGuidelineExecutions(ArtifactId string, ArtifactVer
 
 	body, _, err := s.doRequest(req)
 	if err != nil {
-		return nil, guidelineError(err)
+		return nil, odataError(err)
 	}
 
 	var data map[string]interface{}
@@ -220,7 +220,7 @@ func (s *CPIClient) ReadDesignGuidelineExecutionResult(ArtifactId string, Artifa
 
 	body, _, err := s.doRequest(req)
 	if err != nil {
-		return nil, nil, guidelineError(err)
+		return nil, nil, odataError(err)
 	}
 
 	var data map[string]interface{}
@@ -289,7 +289,7 @@ func (s *CPIClient) SkipDesignGuideline(ArtifactId string, ArtifactVersion strin
 	req.Header.Set("Accept", "application/json")
 
 	if _, _, err := s.doRequest(req); err != nil {
-		return guidelineError(err)
+		return odataError(err)
 	}
 
 	return nil
@@ -322,10 +322,10 @@ func parseDesignGuideline(guidelineJson map[string]interface{}) *DesignGuideline
 	}
 }
 
-//guidelineError replaces the raw OData error document doRequest returns with
+//odataError replaces the raw OData error document doRequest returns with
 //the message inside it, e.g. "SkipReason must not be empty." Both the JSON and
 //the XML form are understood.
-func guidelineError(err error) error {
+func odataError(err error) error {
 
 	raw := []byte(strings.TrimSpace(err.Error()))
 

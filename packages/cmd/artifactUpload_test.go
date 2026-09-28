@@ -55,6 +55,8 @@ type stubTenant struct {
 	FailingDownloads map[string]bool
 	//Design guideline state, nil until a guideline test sets it up
 	Guidelines *stubGuidelines
+	//Discover, runtime and delete state, nil until a package test sets it up
+	PackageOps *stubPackageOps
 	Calls      []tenantCall
 }
 
@@ -115,6 +117,11 @@ func (tenant *stubTenant) handle(writer http.ResponseWriter, request *http.Reque
 
 	//Design guideline calls, see artifactGuidelines_test.go
 	if tenant.handleGuidelines(writer, request) {
+		return
+	}
+
+	//Copy, delete and runtime calls, see packageCopyDelete_test.go
+	if tenant.handlePackageOps(writer, request) {
 		return
 	}
 
@@ -184,7 +191,7 @@ func (tenant *stubTenant) handle(writer http.ResponseWriter, request *http.Reque
 			return
 		}
 		json.NewEncoder(writer).Encode(map[string]interface{}{
-			"d": map[string]interface{}{"Id": packageId, "Name": packageId, "Version": "1.0.0"},
+			"d": map[string]interface{}{"Id": packageId, "Name": packageId, "Version": "1.0.0", "Mode": tenant.PackageModes[packageId]},
 		})
 
 	case request.Method == http.MethodPost && strings.HasSuffix(path, "/IntegrationPackages"):

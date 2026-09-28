@@ -180,7 +180,7 @@ EOT
  - Copy package from discover to design area
 
 ```bash
-landscaper package copy --pkg=SAPAribaAnalyticalReportingIntegrationwithThirdParty --env=Dev
+landscaper package copy --id=SAPAribaAnalyticalReportingIntegrationwithThirdParty --env=Dev
 ```
 
 ```bash
@@ -189,15 +189,16 @@ landscaper package copy --pkg=SAPAribaAnalyticalReportingIntegrationwithThirdPar
 ID:             SAPAribaAnalyticalReportingIntegrationwithThirdParty
 Name:           SAP Ariba Integration with Third-Party for Analytical Reporting
 Version:        1.0.0
-ShortText:      The integration package provides iFlows for consumption of Ariba APIs for Analytical Reporting ( Standard/Custom Templates) with CSV Output for integrating with Third Party
+Mode:           EDIT_ALLOWED
+Vendor:         SAP
 
 ===Artifact list===
 
-#       ArtefactId                                                              Version Name
-1       Common_Resource_-_Job_Request                                           1.0.3   Common Resource - Job Request
-2       Common_Resource_-_Job_Store                                             1.0.5   Common Resource - Job Store
-3       Analytical_Reporting_-_Template_Name_-_Async_Fetch_and_Reporting        1.0.2   Analytical Reporting - Template Name - Async Fetch and Reporting
-4       Generic_Report_Content_Generation                                       1.0.1   Generic Report Content Generation
+#       ArtefactId                                                              Version Type
+1       Common_Resource_-_Job_Request                                           1.0.3   IntegrationFlow
+2       Common_Resource_-_Job_Store                                             1.0.5   IntegrationFlow
+3       Analytical_Reporting_-_Template_Name_-_Async_Fetch_and_Reporting        1.0.2   IntegrationFlow
+4       Generic_Report_Content_Generation                                       1.0.1   IntegrationFlow
 ```
 
 Package in SAP CPI:
@@ -813,6 +814,140 @@ landscaper init --skip-parameters=
 
 The `template` attribute of artifacts is not filled, because there is no way to derive it from the tenant. Add it manually after the file is generated.
 
+
+## Working with packages
+
+### Listing packages
+
+```bash
+landscaper package list --env Dev
+```
+
+prints the id of every package in the Design section of the environment's tenant.
+
+### Copying a package from Discover
+
+`package copy` copies a package of the SAP Business Accelerator Hub from the
+Discover section into Design:
+
+```bash
+landscaper package copy --id SAPERPMasterDataIntegrationWithSAPS4HANACloud --env Dev --output json
+```
+
+```json
+{
+  "source": "SAPERPMasterDataIntegrationWithSAPS4HANACloud",
+  "id": "SAPERPMasterDataIntegrationWithSAPS4HANACloud",
+  "name": "SAP ERP Master Data Integration with SAP S/4HANA Cloud",
+  "mode": "EDIT_ALLOWED",
+  "vendor": "SAP",
+  "version": "1.0.0",
+  "importMode": "",
+  "status": "copied",
+  "artifacts": [
+    {"id": "Create_or_Change_Equipment_from_SAP_ERP_to_SAP_S4HANA_Cloud", "version": "1.0.0", "type": "IntegrationFlow"}
+  ]
+}
+```
+
+`--id` is the technical name the Hub shows in the package URL. It is used as it
+is: unlike the global `--pkg`, which is still accepted as an alias, it never
+receives the environment suffix. `id` in the result is the package that was
+actually created in Design, which is what a later `package delete` should target.
+
+A package that is already in Design is not touched. The tenant refuses the copy
+and the command exits with `5`, unless `--import-mode` says what to do:
+
+| `--import-mode` | Effect |
+|---|---|
+| `overwrite` | Replace the package in Design |
+| `overwrite-merge` | Replace it, keeping the configuration of its artifacts |
+| `create-copy` | Create another copy. `--suffix LSC` creates `<id>.LSC`, with `.LSC` added to the artifact ids as well |
+
+| Exit code | Meaning |
+|---|---|
+| `0` | Copied |
+| `5` | Already in Design and no `--import-mode` given |
+| `6` | Not in Discover, including a custom package that exists only in Design |
+| `1` | Anything else |
+
+### Downloading SAP content
+
+Once copied, an SAP package downloads like any other:
+
+```bash
+landscaper artifact download --packages SAPERPMasterDataIntegrationWithSAPS4HANACloud --env Dev --output refs/sap
+```
+
+This works for **editable** (`EDIT_ALLOWED`) SAP packages, which are most of the
+Hub. SAP does not hand out the content of **configure-only** (`READ_ONLY`)
+packages; the tenant answers "Cannot download the artifact from a configure
+only package". For such a package `artifact download` asks for no content,
+reports every artifact as `not downloadable (configure-only SAP package)` and
+exits with `7`, so a caller can tell it apart from a failure (`1`).
+`--download-all` keeps skipping configure-only packages with a warning.
+
+`--packages` appends the suffix of `--env`, so download copied SAP packages from
+an environment without suffix.
+
+### Deleting a package
+
+```bash
+landscaper package delete --pkg SAPERPMasterDataIntegrationWithSAPS4HANACloud --env Dev --yes
+```
+
+deletes the package with all its artifacts: integration flows, value mappings,
+script collections and message mappings. A package declared in the landscape
+configuration gets the suffix of `--env`, any other id is used as it is.
+
+Several guards come before the deletion:
+
+ - **Deployed content.** The tenant would delete the package and leave its deployed content running without a design time. The command refuses (exit `5`) and lists what is deployed; `--undeploy` undeploys it first and waits until the runtime no longer holds it.
+ - **Managed packages.** A package declared in the landscape configuration is refused (exit `6`) unless `--force` is given, because the landscape would point to nothing afterwards.
+ - **Confirmation.** In a terminal the command asks. Without one, `--yes` is required, so a pipeline never hangs on a question.
+ - **`--dry-run`** reports the package, its artifacts and their deployed state, and writes nothing.
+
+The tenant deletes in the background, so the command waits (`--timeout`,
+`--interval`) until the package is really gone before reporting success.
+
+```json
+{
+  "id": "PrivateLinkProxy",
+  "env": "Dev",
+  "deleted": true,
+  "dryRun": false,
+  "status": "deleted",
+  "artifacts": [
+    {"id": "AzureBlobConnectivityPrivateLinkServiceSample", "type": "IntegrationFlow", "version": "1.0.0", "deployed": true}
+  ],
+  "undeployed": ["AzureBlobConnectivityPrivateLinkServiceSample"]
+}
+```
+
+| Exit code | Meaning |
+|---|---|
+| `0` | Deleted, or `--dry-run` |
+| `4` | The package does not exist |
+| `5` | Content is deployed and no `--undeploy` given |
+| `6` | Declared in the landscape configuration and no `--force` given |
+| `1` | Anything else, including a declined confirmation |
+
+With `--log`, the audit log gets one `item` record per artifact removed or
+undeployed.
+
+### Reference downloads: copy, download, delete
+
+A tool that learns from SAP standard content can leave the tenant as it found
+it. Only a package the copy itself created is deleted; one that was already in
+Design makes the copy exit `5` and is left alone:
+
+```bash
+id=$(landscaper package copy --id PrivateLinkProxy --env Dev --output json | jq -r 'select(.status=="copied") | .id')
+if [ -n "$id" ]; then
+  landscaper artifact download --packages "$id" --env Dev --output refs/sap   #7: configure only
+  landscaper package delete --pkg "$id" --env Dev --yes --output json
+fi
+```
 
 ## How to deploy from a git repository to a tenant
 

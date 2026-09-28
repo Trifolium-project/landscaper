@@ -16,6 +16,9 @@ limitations under the License.
 package cmd
 
 import (
+	"strings"
+
+	"github.com/Trifolium-project/landscaper/packages/landscape"
 	"github.com/spf13/cobra"
 )
 
@@ -45,4 +48,14 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// packageCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+//rawPackageFlag undoes what root.go does to the global --pkg: it appends the
+//suffix of --env before any command runs, so the value as typed is only
+//available by stripping the suffix again
+func rawPackageFlag(environment *landscape.Environment) string {
+	if environment.Suffix == "" {
+		return *pkg
+	}
+	return strings.TrimSuffix(*pkg, environment.Suffix)
 }
