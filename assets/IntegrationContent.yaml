@@ -68,6 +68,7 @@ tags:
 - name: Endpoints of Runtime Artifacts
 - name: Value Mappings
 - name: Integration Adapter
+- name: Integration Flow - Design Guidelines
 paths:
   /CopyIntegrationPackage:
     post:
@@ -464,6 +465,144 @@ paths:
                 message:
                   lang: en
                   value: Requested entity could not be found.
+  #Message mapping and script collection listings of a package, taken from the
+  #current Business Accelerator Hub spec for "package delete". Observed on a
+  #tenant (2026-09): DELETE IntegrationPackages answers 202 and deletes in the
+  #background, and it deletes a package with deployed content, leaving that
+  #content running. See changelog/0008-package-copy-delete.md.
+  /IntegrationPackages('{Id}')/MessageMappingDesigntimeArtifacts:
+    get:
+      description: You can use the following request to get all message mappings of an integration package by package Id.
+      summary: Get all message mappings of an integration package.
+      tags: [Integration Packages - Design]
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          ID of integration package <br>
+          Example: ```MessageMappingExamples```
+        type: string
+      - name: $select
+        in: query
+        description: Select properties to be returned.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum: [Id, Version, PackageId, Name, Description, ArtifactContent]
+      responses:
+        '200':
+          description: Retrieved message mappings of the integration package
+          schema:
+            title: Collection of message mappings with same integration package ID
+            type: object
+            properties:
+              value:
+                type: array
+                items: {$ref: '#/definitions/com.sap.hci.api.MessageMappingDesigntimeArtifact'}
+          examples:
+            application/json:
+              d:
+                results:
+                - Id: MessageMapping1
+                  Version: 1.0.0
+                  PackageId: MessageMappingExamples
+                  Name: MessageMapping1
+                  Description: A
+                  ArtifactContent: null
+                  Resources: {}
+                - Id: MessageMapping2
+                  Version: 8.1.0
+                  PackageId: MessageMappingExamples
+                  Name: MessageMapping2
+                  Description: ''
+                  ArtifactContent: null
+                  Resources: {}
+        '400': {$ref: '#/responses/400'}
+        '401': {$ref: '#/responses/401'}
+        '403': {$ref: '#/responses/403'}
+        '404': {$ref: '#/responses/404'}
+        '429': {$ref: '#/responses/429'}
+        default: {$ref: '#/responses/error'}
+  /IntegrationPackages('{Id}')/ScriptCollectionDesigntimeArtifacts:
+    get:
+      description: You can use the following request to get all script collections of an integration package by package Id.
+      summary: Get all script collections of a package.
+      tags: [Integration Packages - Design]
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration package <br>
+          Example: ```packageName```
+        type: string
+      responses:
+        '200':
+          description: Retrieved script collections of the integration package
+          schema:
+            title: Set of script collections with same integration package Id
+            type: object
+            properties:
+              value:
+                type: array
+                items: {$ref: '#/definitions/com.sap.hci.api.ScriptCollectionDesigntimeArtifact'}
+          examples:
+            application/json:
+              d:
+                results:
+                - {Id: ScriptCollectionArtifact1, Version: 2.0.0, PackageId: packageName, Name: ScriptCollectionArtifact1, Description: Script Collection for test, ArtifactContent: null}
+                - {Id: ScriptCollectionArtifact2, Version: 2.0.0, PackageId: packageName, Name: ScriptCollectionArtifact2, Description: Script Collection for test, ArtifactContent: null}
+        '400': {$ref: '#/responses/400'}
+        '401': {$ref: '#/responses/401'}
+        '403': {$ref: '#/responses/403'}
+        '404': {$ref: '#/responses/404'}
+        '429': {$ref: '#/responses/429'}
+        default: {$ref: '#/responses/error'}
+  ? /IntegrationPackages('{Id}')/ScriptCollectionDesigntimeArtifacts(Id='{ScriptCollectionArtifactID}',Version='{ArtifactVersion}')
+  : get:
+      description: You can use the following request to get script collection of an integration package by package Id, script collection Id and script collection version.
+      summary: Get a script collection of a package.
+      tags: [Integration Packages - Design]
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration package <br>
+          Example: ```packageName```
+        type: string
+      - name: ArtifactId
+        in: path
+        required: true
+        description: |-
+          Id of script collection <br>
+          Example: ```ScriptCollectionArtifactID```
+        type: string
+      - name: ArtifactVersion
+        in: path
+        required: true
+        description: |-
+          Version of script collection <br>
+          You can enter either ```active``` or the version name (e.g. ```2.0.0```) for retrieving the current version.
+        type: string
+        default: active
+      responses:
+        '200':
+          description: Retrieved script collection
+          schema: {$ref: '#/definitions/com.sap.hci.api.ScriptCollectionDesigntimeArtifact'}
+          examples:
+            application/json:
+              d:
+                results:
+                - {Id: ScriptCollectionArtifactID, Version: 2.0.0, PackageId: packageName, Name: ScriptCollectionArtifactID, Description: Script Collection for test, ArtifactContent: null}
+        '400': {$ref: '#/responses/400'}
+        '401': {$ref: '#/responses/401'}
+        '403': {$ref: '#/responses/403'}
+        '404': {$ref: '#/responses/404'}
+        '429': {$ref: '#/responses/429'}
+        default: {$ref: '#/responses/error'}
   /IntegrationPackages('{Id}')/IntegrationDesigntimeArtifacts:
     get:
       description: You can use the following request to get all integration flows of a designtime integration package by package Id.
@@ -3505,6 +3644,238 @@ paths:
               type: string
         default:
           $ref: '#/responses/error'
+  #Design guidelines, taken from the current Business Accelerator Hub spec. A
+  #tenant (2026-09) differs from it: the execute call answers $format=json with
+  #501, the skip body key is GuidelineId (not GudelineId), only the latest
+  #execution id is valid, and a skip or revert is refused when the rule is
+  #already in that state. See changelog/0007-design-guidelines.md.
+  /IntegrationDesigntimeArtifacts(Id='{Id}',Version='{Version}')/DesignGuidelineExecutionResults:
+    get:
+      description: You can use the following request to get the status of the guidelines execution.
+      summary: Get guidelines execution status.
+      tags: [Integration Flow - Design Guidelines]
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration flow<br>
+          Example: **IntegrationFlowWithConfiguration**
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration flow<br>
+          You can enter either **active** or the version name (e.g. **1.0.5**) for retrieving the current version.
+        type: string
+        default: active
+      responses:
+        '200':
+          description: Retrieved execution status
+          schema:
+            title: Execution status
+            type: object
+            properties:
+              value:
+                type: array
+                items: {$ref: '#/definitions/com.sap.hci.api.DesignGuidelineExecutionResult'}
+          examples:
+            application/json:
+              d:
+                results:
+                - {ExecutionId: b609174e95564c0ead17ee319c24bbe7, ArtifactVersion: 1.0.0, ExecutionStatus: FAIL, ExecutionTime: '1720084676209'}
+        '400': {$ref: '#/responses/400'}
+        '401': {$ref: '#/responses/401'}
+        '403': {$ref: '#/responses/403'}
+        '404': {$ref: '#/responses/404'}
+        '429': {$ref: '#/responses/429'}
+        default: {$ref: '#/responses/error'}
+  /IntegrationDesigntimeArtifacts(Id='{Id}',Version='{Version}')/DesignGuidelineExecutionResults('{ExecutionId}'):
+    get:
+      description: You can use the following request to get the results of the guidelines execution.
+      summary: Get guidelines execution results.
+      tags: [Integration Flow - Design Guidelines]
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration flow<br>
+          Example: **IntegrationFlowWithConfiguration**.
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration flow<br>
+          You can enter either **active** or the version name (e.g. **1.0.5**) for retrieving the current version.
+        type: string
+        default: active
+      - name: ExecutionId
+        in: path
+        required: true
+        description: |-
+          Id of design guideline execution<br>
+          Example: **b609174e95564c0ead17ee319c24bbe7**.
+        type: string
+      - name: $expand
+        in: query
+        description: Expand related entities.
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+          enum: [DesignGuidelines]
+      responses:
+        '200':
+          description: Retrieved execution status
+          schema:
+            title: Execution status
+            type: object
+            properties:
+              value:
+                type: array
+                items: {$ref: '#/definitions/com.sap.hci.api.DesignGuidelineExecutionResult'}
+          examples:
+            application/json:
+              d:
+                results:
+                - {GuidelineId: SPECIAL_HEADER_VARIABLES_ENABLED_FOR_MONITORING, GuidelineName: Define Identifiers To Search In Message Processing Logs, Category: Keep Readability in Mind, Severity: Medium, Applicability: Not Applicable, Compliance: Not Applicable, IsGuidelineSkipped: 'false', SkipReason: '', SkippedBy: '', ExpectedKPI: '', ActualKPI: '', ViolatedComponents: ''}
+                - {GuidelineId: USE_BYTE_ARRAY_AS_OUTPUT_TYPE, GuidelineName: Use ByteArray As Output Type To Process Large Messages, Category: Optimize Memory Footprint, Severity: Low, Applicability: Not Applicable, Compliance: Not Applicable, IsGuidelineSkipped: 'false', SkipReason: '', SkippedBy: '', ExpectedKPI: '', ActualKPI: '', ViolatedComponents: ''}
+        '400': {$ref: '#/responses/400'}
+        '401': {$ref: '#/responses/401'}
+        '403': {$ref: '#/responses/403'}
+        '404': {$ref: '#/responses/404'}
+        '429': {$ref: '#/responses/429'}
+        default: {$ref: '#/responses/error'}
+  /ExecuteIntegrationDesigntimeArtifactsGuidelines:
+    post:
+      description: You can use the following request to validate integration flow against activated guidelines.
+      summary: Execute guidelines for intgeration flow.
+      tags: [Integration Flow - Design Guidelines]
+      parameters:
+      - name: Id
+        in: query
+        required: true
+        description: |-
+          Id of integration flow - enclosed in single quotes <br>
+          Example: **'IntegrationFlowWithConfiguration'**.
+        type: string
+      - name: Version
+        in: query
+        required: true
+        description: |-
+          Version of integration flow - enclosed in single quotes <br>
+          You can enter either **'active'** or the version name (e.g. **'1.0.5'**) for retrieving the current version.
+        type: string
+        default: active
+      - {description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling'), in: header, name: X-CSRF-Token, type: string, required: true}
+      responses:
+        '200': {description: Success}
+        '400': {$ref: '#/responses/400'}
+        '401': {$ref: '#/responses/401'}
+        '403': {$ref: '#/responses/403'}
+        '404': {$ref: '#/responses/404'}
+        '429': {$ref: '#/responses/429'}
+        '500':
+          description: Internal server error.
+          schema: {$ref: '#/definitions/odata.error'}
+          examples:
+            application/json:
+              error:
+                code: Internal server error
+                message: {lang: en, value: You can't validate the integration flow as no design guidelines are activated for the tenant by the administrator.}
+        default: {$ref: '#/responses/error'}
+  /IntegrationDesigntimeArtifacts(Id='{Id}',Version='{Version}')/DesignGuidelineExecutionResults('{ExecutionId}')/$value:
+    get:
+      description: You can use the following request to get the report of the guidelines execution as a file.
+      summary: Download guidelines execution report.
+      tags: [Integration Flow - Design Guidelines]
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration flow<br>
+          Example: **IntegrationFlowWithConfiguration**.
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration flow<br>
+          You can enter either **active** or the version name (e.g. **1.0.5**) for retrieving the current version.
+        type: string
+        default: active
+      - name: ExecutionId
+        in: path
+        required: true
+        description: |-
+          Id of design guideline execution<br>
+          Example: **b609174e95564c0ead17ee319c24bbe7**.
+        type: string
+      - name: type
+        in: query
+        required: true
+        description: Type of the report file.
+        type: string
+        items:
+          type: string
+          enum: [xls]
+      responses:
+        '200':
+          description: Retrieved entity
+          schema: {type: file}
+        '400': {$ref: '#/responses/400'}
+        '401': {$ref: '#/responses/401'}
+        '403': {$ref: '#/responses/403'}
+        '404': {$ref: '#/responses/404'}
+        '429': {$ref: '#/responses/429'}
+        default: {$ref: '#/responses/error'}
+  /IntegrationDesigntimeArtifacts(Id='{Id}',Version='{Version}')/$links/DesignGuidelineExecutionResults('{ExecutionId}'):
+    put:
+      description: You can use the following request to revert or skip a guidline.
+      summary: Revert or skip a guideline.
+      tags: [Integration Flow - Design Guidelines]
+      produces: ['']
+      consumes: [application/json]
+      parameters:
+      - name: Id
+        in: path
+        required: true
+        description: |-
+          Id of integration flow<br>
+          Example: **IntegrationFlowWithConfiguration**.
+        type: string
+      - name: Version
+        in: path
+        required: true
+        description: |-
+          Version of integration flow<br>
+          You can enter either **active** or the version name (e.g. **1.0.5**) for retrieving the current version.
+        type: string
+        default: active
+      - name: ExecutionId
+        in: path
+        required: true
+        description: |-
+          Id of design guideline execution<br>
+          Example: **b609174e95564c0ead17ee319c24bbe7**.
+        type: string
+      - name: SkipRevertGuideline
+        in: body
+        description: Revert or skip a guideline.
+        schema: {$ref: '#/definitions/com.sap.hci.api.DesignGuidelineExecutionResults-skip'}
+      - {description: CSRF token that is valid for the current session (see resource 'CSRF Token Handling'), in: header, name: X-CSRF-Token, type: string, required: true}
+      responses:
+        '200': {description: Success}
+        '400': {$ref: '#/responses/400'}
+        '401': {$ref: '#/responses/401'}
+        '403': {$ref: '#/responses/403'}
+        '404': {$ref: '#/responses/404'}
+        '429': {$ref: '#/responses/429'}
+        default: {$ref: '#/responses/error'}
 definitions:
   com.sap.hci.api.IntegrationRuntimeArtifact:
     type: object
@@ -4167,6 +4538,116 @@ definitions:
         format: base64url
         example: integration adapter esa file content in base64-encoded format
     title: IntegrationAdapterDesigntimeArtifact (for import)
+  com.sap.hci.api.DesignGuidelineExecutionResults-skip:
+    type: object
+    properties:
+      GudelineId: {type: string}
+      IsGuidelineSkipped: {type: boolean, description: 'true = skip, false = revert'}
+      SkipReason: {type: string}
+    title: ScriptCollectionDesigntimeArtifact (for update)
+  com.sap.hci.api.DesignGuidelineExecutionResult:
+    type: object
+    properties:
+      ExecutionId:
+        type: [string, 'null']
+      ArtifactVersion:
+        type: [string, 'null']
+      ExecutionStatus:
+        type: [string, 'null']
+      ExecutionTime:
+        type: [string, 'null']
+      ReportType:
+        type: [string, 'null']
+      DesignGuidelines:
+        title: Collection of DesignGuideline
+        type: object
+        properties:
+          results:
+            type: array
+            items: {$ref: '#/definitions/com.sap.hci.api.DesignGuideline'}
+    title: DesignGuidelineExecutionResult
+  com.sap.hci.api.DesignGuideline:
+    type: object
+    properties:
+      GuidelineId: {type: string}
+      GuidelineName:
+        type: [string, 'null']
+      Category:
+        type: [string, 'null']
+      Severity:
+        type: [string, 'null']
+      Applicability:
+        type: [string, 'null']
+      Compliance:
+        type: [string, 'null']
+      IsGuidelineSkipped:
+        type: [boolean, 'null']
+      SkipReason:
+        type: [string, 'null']
+      SkippedBy:
+        type: [string, 'null']
+      ExpectedKPI:
+        type: [string, 'null']
+      ActualKPI:
+        type: [string, 'null']
+      ViolatedComponents:
+        type: [string, 'null']
+    title: DesignGuideline
+  com.sap.hci.api.MessageMappingDesigntimeArtifact:
+    type: object
+    properties:
+      Id:
+        type: [string, 'null']
+      Version:
+        type: [string, 'null']
+      PackageId:
+        type: [string, 'null']
+      Name:
+        type: [string, 'null']
+      Description:
+        type: [string, 'null']
+      ArtifactContent:
+        type: [string, 'null']
+        format: base64url
+      Resources:
+        title: Collection of Resource
+        type: object
+        properties:
+          results:
+            type: array
+            items: {$ref: '#/definitions/com.sap.hci.api.Resource'}
+    title: MessageMappingDesigntimeArtifact
+  com.sap.hci.api.ScriptCollectionDesigntimeArtifact:
+    type: object
+    properties:
+      Id:
+        type: [string, 'null']
+      Version:
+        type: [string, 'null']
+      PackageId:
+        type: [string, 'null']
+      Name:
+        type: [string, 'null']
+      Description:
+        type: [string, 'null']
+      ArtifactContent:
+        type: [string, 'null']
+        format: base64url
+      Resources:
+        title: Collection of Resource
+        type: object
+        properties:
+          results:
+            type: array
+            items: {$ref: '#/definitions/com.sap.hci.api.Resource'}
+      DesignGuidelineExecutionResults:
+        title: Collection of DesignGuidelineExecutionResult
+        type: object
+        properties:
+          results:
+            type: array
+            items: {$ref: '#/definitions/com.sap.hci.api.DesignGuidelineExecutionResult'}
+    title: ScriptCollectionDesigntimeArtifact
 parameters:
   top:
     name: $top
@@ -4230,6 +4711,8 @@ responses:
     description: Not found
     schema:
       $ref: '#/definitions/odata.error'
+  '429':
+    description: Too many requests. Server's rate limit exceeded.
   '500':
     description: Internal server error - the requested operation led to an error during execution.
     schema:

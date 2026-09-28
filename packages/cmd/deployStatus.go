@@ -233,3 +233,66 @@ func printDeployError(status *deployStatus) {
 	}
 	fmt.Printf("\nDeploy error:\n%s\n", status.ErrorText)
 }
+
+//runtimeUndeployer is the part of CPIClient undeploying needs
+type runtimeUndeployer interface {
+	ReadIntegrationRuntimeArtifacts() ([]*cpiclient.IntegrationRuntimeArtifact, error)
+	UndeployIntegrationRuntimeArtifact(ArtifactId string) error
+}
+
+//undeployAndWait undeploys the given runtime artifacts and polls the runtime
+//list until none of them is left. The list is used rather than
+//readDeployStatus, because that one reads any failure as "not deployed", and
+//deleting content on a network error would leave its runtime running. Shared
+//by "package delete" and meant for a future "artifact delete".
+func undeployAndWait(client runtimeUndeployer, artifactIds []string, timeout time.Duration, interval time.Duration) error {
+
+	if interval <= 0 {
+		interval = defaultDeployInterval
+	}
+
+	for _, artifactId := range artifactIds {
+		if err := client.UndeployIntegrationRuntimeArtifact(artifactId); err != nil {
+			return fmt.Errorf("Cannot undeploy %s: %s", artifactId, err)
+		}
+	}
+
+	deadline := time.Now().Add(timeout)
+
+	for {
+		remaining, err := deployedAmong(client, artifactIds)
+		if err != nil {
+			return err
+		}
+		if len(remaining) == 0 {
+			return nil
+		}
+		if !time.Now().Before(deadline) {
+			return fmt.Errorf("Still deployed after %s: %s", timeout, strings.Join(remaining, ", "))
+		}
+		time.Sleep(interval)
+	}
+}
+
+//deployedAmong returns the ids, that the runtime still holds
+func deployedAmong(client runtimeUndeployer, artifactIds []string) ([]string, error) {
+
+	runtimeArtifacts, err := client.ReadIntegrationRuntimeArtifacts()
+	if err != nil {
+		return nil, err
+	}
+
+	deployed := map[string]bool{}
+	for _, runtimeArtifact := range runtimeArtifacts {
+		deployed[runtimeArtifact.Id] = true
+	}
+
+	remaining := []string{}
+	for _, artifactId := range artifactIds {
+		if deployed[artifactId] {
+			remaining = append(remaining, artifactId)
+		}
+	}
+
+	return remaining, nil
+}

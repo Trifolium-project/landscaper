@@ -180,7 +180,7 @@ EOT
  - Copy package from discover to design area
 
 ```bash
-landscaper package copy --pkg=SAPAribaAnalyticalReportingIntegrationwithThirdParty --env=Dev
+landscaper package copy --id=SAPAribaAnalyticalReportingIntegrationwithThirdParty --env=Dev
 ```
 
 ```bash
@@ -189,15 +189,16 @@ landscaper package copy --pkg=SAPAribaAnalyticalReportingIntegrationwithThirdPar
 ID:             SAPAribaAnalyticalReportingIntegrationwithThirdParty
 Name:           SAP Ariba Integration with Third-Party for Analytical Reporting
 Version:        1.0.0
-ShortText:      The integration package provides iFlows for consumption of Ariba APIs for Analytical Reporting ( Standard/Custom Templates) with CSV Output for integrating with Third Party
+Mode:           EDIT_ALLOWED
+Vendor:         SAP
 
 ===Artifact list===
 
-#       ArtefactId                                                              Version Name
-1       Common_Resource_-_Job_Request                                           1.0.3   Common Resource - Job Request
-2       Common_Resource_-_Job_Store                                             1.0.5   Common Resource - Job Store
-3       Analytical_Reporting_-_Template_Name_-_Async_Fetch_and_Reporting        1.0.2   Analytical Reporting - Template Name - Async Fetch and Reporting
-4       Generic_Report_Content_Generation                                       1.0.1   Generic Report Content Generation
+#       ArtefactId                                                              Version Type
+1       Common_Resource_-_Job_Request                                           1.0.3   IntegrationFlow
+2       Common_Resource_-_Job_Store                                             1.0.5   IntegrationFlow
+3       Analytical_Reporting_-_Template_Name_-_Async_Fetch_and_Reporting        1.0.2   IntegrationFlow
+4       Generic_Report_Content_Generation                                       1.0.1   IntegrationFlow
 ```
 
 Package in SAP CPI:
@@ -446,6 +447,155 @@ the **previous** version as `STARTED` for a while. `--wait` therefore only
 accepts a runtime status whose version matches the one just uploaded, so a
 success is never reported for a deployment that has not happened yet.
 
+### Checking design guidelines
+
+SAP Cloud Integration ships a static analysis of integration flows, the
+[design guidelines](https://help.sap.com/docs/integration-suite/sap-integration-suite/design-guidelines):
+around forty rules on exception handling, streaming, security and scripting,
+each with a severity. `artifact guidelines` runs them through the API, reports
+the result per rule, and skips rules an artifact does not follow on purpose.
+The guidelines have to be activated for the tenant by an administrator.
+
+```bash
+#Run the guidelines and report the result
+landscaper artifact guidelines run --env Dev --artifacts Order_API_TEST_HARNESS,GENAI_OrderQuote
+
+#Read the latest result without running again
+landscaper artifact guidelines results --env Dev --packages TestHarnessPreparation
+
+#Every artifact of the landscape configuration, failing only on High rules
+landscaper artifact guidelines run --env Dev --all-declared --fail-on high --output json
+```
+
+Exactly one of `--artifacts`, `--packages` and `--all-declared` selects what to
+check. Ids are given without the environment suffix, which the command appends.
+`--packages` reads the package from the tenant, so artifacts not declared in the
+landscape configuration are checked too.
+
+```
+#  ArtefactId              Package                 Version  Status         Not compliant  Skipped  Violations  Declared skips  Error
+1  Order_API_TEST_HARNESS  TestHarnessPreparation  1.0.18   not-compliant  6              1        6           1/1
+
+===Order_API_TEST_HARNESS===
+#  Rule                                                 Severity  Status         Elements                         Detail
+1  STREAM_THE_XML_SLURPER_INPUT_IN_GROOVY_SCRIPTS       High      not-compliant  CallActivity_59,CallActivity_75  You have configured the script to parse the message body using XMLSlurper without streaming
+2  HANDLE_EXCEPTIONS                                    High      not-compliant  Process_1                        You have configured the artifact without an exception subprocess
+3  CONTINUE_MESSAGE_PROCESSING_EVEN_AFTER_AN_EXCEPTION  Low       skipped        Process_54,Process_70            Skipped: Errors are handled by the caller
+...
+===Summary===
+Environment:                  Dev
+Artifacts:                    1
+Compliant:                    0
+Not compliant:                1
+Not finished:                 0
+Errors:                       0
+Violations (--fail-on low):   6
+```
+
+The text output lists only the rules that need attention. `--output json`
+carries every rule, compliant and not applicable ones included:
+
+```json
+{
+  "environment": "Dev",
+  "failOn": "low",
+  "summary": {"artifacts": 1, "compliant": 0, "notCompliant": 1, "notFinished": 0, "errors": 0, "violations": 6},
+  "artifacts": [{
+    "id": "Order_API_TEST_HARNESS",
+    "package": "TestHarnessPreparation",
+    "version": "1.0.18",
+    "executionId": "1fb1f92a45e04c5696efc7121ce91062",
+    "executionStatus": "FAIL",
+    "executionTime": "2026-09-28T07:41:47Z",
+    "status": "not-compliant",
+    "violations": 6,
+    "counts": {"compliant": 19, "not-applicable": 13, "not-compliant": 6, "skipped": 1},
+    "declaredSkips": {"declared": 1, "applied": 1, "failures": []},
+    "rules": [{
+      "id": "STREAM_THE_XML_SLURPER_INPUT_IN_GROOVY_SCRIPTS",
+      "name": "Use of XMLSlurper",
+      "category": "Scripting Guidelines",
+      "severity": "High",
+      "applicability": "Applicable",
+      "compliance": "Non-Compliant",
+      "status": "not-compliant",
+      "skipped": false,
+      "skipReason": "",
+      "skippedBy": "",
+      "expected": "Stream the message body to the XMLSlurper by using message.getBody(java.io.Reader.class) ...",
+      "actual": "You have configured the script to parse the message body using XMLSlurper without streaming",
+      "violatedComponents": [
+        {"id": "CallActivity_59", "name": "Build Response"},
+        {"id": "CallActivity_75", "name": "Build Delete Response"}
+      ],
+      "violatedComponentsRaw": "{CallActivity_59=Build Response, CallActivity_75=Build Delete Response}"
+    }]
+  }]
+}
+```
+
+A rule's `status` is one of `compliant`, `not-compliant`, `not-applicable` or
+`skipped`. An artifact's is `compliant`, `not-compliant`, `not-executed` (never
+checked, only from `results`), `not-finished` or `error`. `violatedComponents`
+are the ids of the model elements, as the `.iflw` file names them.
+
+#### Exit codes of run and results
+
+| Code | Meaning |
+|---|---|
+| `0` | Nothing at or above `--fail-on` is violated |
+| `7` | A rule at or above `--fail-on` is not compliant and not skipped |
+| `3` | An execution did not finish, or an artifact was never checked |
+| `1` | Anything else went wrong, e.g. an artifact that does not exist |
+
+`--fail-on` takes `low` (the default, any violation fails), `medium`, `high` or
+`none`. An artifact that fails does not stop a batch: it is reported with its
+error and the others are still checked.
+
+#### Skipping rules
+
+```bash
+landscaper artifact guidelines skip --env Dev --artifacts Order_API_TEST_HARNESS \
+  --rule CONTINUE_MESSAGE_PROCESSING_EVEN_AFTER_AN_EXCEPTION --reason "Errors are handled by the caller"
+landscaper artifact guidelines unskip --env Dev --artifacts Order_API_TEST_HARNESS \
+  --rule CONTINUE_MESSAGE_PROCESSING_EVEN_AFTER_AN_EXCEPTION
+```
+
+The tenant records the reason and who skipped, and keeps the skip for later
+executions. Both commands are safe to repeat: they report `unchanged` when the
+tenant already holds the requested state, and `updated` when an existing skip
+gets a new reason. Some rules are essential and cannot be skipped at all.
+
+To keep exceptions in git, declare them in the landscape configuration instead:
+
+```yaml
+packages:
+  - id: TestHarnessPreparation
+    artifacts:
+      - id: Order_API_TEST_HARNESS
+        guidelineSkips:
+          - rule: CONTINUE_MESSAGE_PROCESSING_EVEN_AFTER_AN_EXCEPTION
+            reason: Errors are handled by the caller
+```
+
+`artifact guidelines run` applies them to every execution (`--no-declared-skips`
+turns that off), and `artifact upload --apply-guideline-skips` applies them after
+the upload and the configuration, before `--deploy`, with an extra
+`Guideline Skips` column in the table. A declared reason replaces one filed by
+hand. A skip the tenant refuses - an unknown or essential rule - is reported and
+does not fail the command. `init` keeps the declared skips when it regenerates
+the `packages:` section.
+
+#### The rule catalogue
+
+```bash
+landscaper artifact guidelines rules --env Dev --artifacts Order_API_TEST_HARNESS --output json
+```
+
+lists id, name, category and severity of every activated rule. The API offers
+no catalogue of its own, so the list is taken from an execution of the given
+artifacts, which is run first when there is none.
+
 ### Audit log
 
 Every command can record what it did. Logging is **off by default** and enabled
@@ -611,6 +761,10 @@ Now, only integration flows are supported, but it is also planned to add other o
 
 You need to add artifact information, if it is necessary to maintain different configuration for each environment. For example, you may need to maintain different endpoints to external systems and credential aliases for each environment. Keep in mind, that all configuration parameters, that are not mentioned in landscape.yaml file, value from original environment will be copied. This means, that you can omit all parameters, that are not changing between environments, in landscape.yaml. This will help to keep configuration file clean.
 
+An artifact may also list `guidelineSkips`, design guideline rules it does not
+follow on purpose, each with a `rule` and a mandatory `reason`. See
+[Checking design guidelines](#checking-design-guidelines).
+
 #### **Gathering the landscape definition automatically**
 
 Writing packages, artifacts and their parameters by hand is tedious for a grown tenant. The **init** command does it for you.
@@ -660,6 +814,140 @@ landscaper init --skip-parameters=
 
 The `template` attribute of artifacts is not filled, because there is no way to derive it from the tenant. Add it manually after the file is generated.
 
+
+## Working with packages
+
+### Listing packages
+
+```bash
+landscaper package list --env Dev
+```
+
+prints the id of every package in the Design section of the environment's tenant.
+
+### Copying a package from Discover
+
+`package copy` copies a package of the SAP Business Accelerator Hub from the
+Discover section into Design:
+
+```bash
+landscaper package copy --id SAPERPMasterDataIntegrationWithSAPS4HANACloud --env Dev --output json
+```
+
+```json
+{
+  "source": "SAPERPMasterDataIntegrationWithSAPS4HANACloud",
+  "id": "SAPERPMasterDataIntegrationWithSAPS4HANACloud",
+  "name": "SAP ERP Master Data Integration with SAP S/4HANA Cloud",
+  "mode": "EDIT_ALLOWED",
+  "vendor": "SAP",
+  "version": "1.0.0",
+  "importMode": "",
+  "status": "copied",
+  "artifacts": [
+    {"id": "Create_or_Change_Equipment_from_SAP_ERP_to_SAP_S4HANA_Cloud", "version": "1.0.0", "type": "IntegrationFlow"}
+  ]
+}
+```
+
+`--id` is the technical name the Hub shows in the package URL. It is used as it
+is: unlike the global `--pkg`, which is still accepted as an alias, it never
+receives the environment suffix. `id` in the result is the package that was
+actually created in Design, which is what a later `package delete` should target.
+
+A package that is already in Design is not touched. The tenant refuses the copy
+and the command exits with `5`, unless `--import-mode` says what to do:
+
+| `--import-mode` | Effect |
+|---|---|
+| `overwrite` | Replace the package in Design |
+| `overwrite-merge` | Replace it, keeping the configuration of its artifacts |
+| `create-copy` | Create another copy. `--suffix LSC` creates `<id>.LSC`, with `.LSC` added to the artifact ids as well |
+
+| Exit code | Meaning |
+|---|---|
+| `0` | Copied |
+| `5` | Already in Design and no `--import-mode` given |
+| `6` | Not in Discover, including a custom package that exists only in Design |
+| `1` | Anything else |
+
+### Downloading SAP content
+
+Once copied, an SAP package downloads like any other:
+
+```bash
+landscaper artifact download --packages SAPERPMasterDataIntegrationWithSAPS4HANACloud --env Dev --output refs/sap
+```
+
+This works for **editable** (`EDIT_ALLOWED`) SAP packages, which are most of the
+Hub. SAP does not hand out the content of **configure-only** (`READ_ONLY`)
+packages; the tenant answers "Cannot download the artifact from a configure
+only package". For such a package `artifact download` asks for no content,
+reports every artifact as `not downloadable (configure-only SAP package)` and
+exits with `7`, so a caller can tell it apart from a failure (`1`).
+`--download-all` keeps skipping configure-only packages with a warning.
+
+`--packages` appends the suffix of `--env`, so download copied SAP packages from
+an environment without suffix.
+
+### Deleting a package
+
+```bash
+landscaper package delete --pkg SAPERPMasterDataIntegrationWithSAPS4HANACloud --env Dev --yes
+```
+
+deletes the package with all its artifacts: integration flows, value mappings,
+script collections and message mappings. A package declared in the landscape
+configuration gets the suffix of `--env`, any other id is used as it is.
+
+Several guards come before the deletion:
+
+ - **Deployed content.** The tenant would delete the package and leave its deployed content running without a design time. The command refuses (exit `5`) and lists what is deployed; `--undeploy` undeploys it first and waits until the runtime no longer holds it.
+ - **Managed packages.** A package declared in the landscape configuration is refused (exit `6`) unless `--force` is given, because the landscape would point to nothing afterwards.
+ - **Confirmation.** In a terminal the command asks. Without one, `--yes` is required, so a pipeline never hangs on a question.
+ - **`--dry-run`** reports the package, its artifacts and their deployed state, and writes nothing.
+
+The tenant deletes in the background, so the command waits (`--timeout`,
+`--interval`) until the package is really gone before reporting success.
+
+```json
+{
+  "id": "PrivateLinkProxy",
+  "env": "Dev",
+  "deleted": true,
+  "dryRun": false,
+  "status": "deleted",
+  "artifacts": [
+    {"id": "AzureBlobConnectivityPrivateLinkServiceSample", "type": "IntegrationFlow", "version": "1.0.0", "deployed": true}
+  ],
+  "undeployed": ["AzureBlobConnectivityPrivateLinkServiceSample"]
+}
+```
+
+| Exit code | Meaning |
+|---|---|
+| `0` | Deleted, or `--dry-run` |
+| `4` | The package does not exist |
+| `5` | Content is deployed and no `--undeploy` given |
+| `6` | Declared in the landscape configuration and no `--force` given |
+| `1` | Anything else, including a declined confirmation |
+
+With `--log`, the audit log gets one `item` record per artifact removed or
+undeployed.
+
+### Reference downloads: copy, download, delete
+
+A tool that learns from SAP standard content can leave the tenant as it found
+it. Only a package the copy itself created is deleted; one that was already in
+Design makes the copy exit `5` and is left alone:
+
+```bash
+id=$(landscaper package copy --id PrivateLinkProxy --env Dev --output json | jq -r 'select(.status=="copied") | .id')
+if [ -n "$id" ]; then
+  landscaper artifact download --packages "$id" --env Dev --output refs/sap   #7: configure only
+  landscaper package delete --pkg "$id" --env Dev --yes --output json
+fi
+```
 
 ## How to deploy from a git repository to a tenant
 

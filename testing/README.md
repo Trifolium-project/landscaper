@@ -36,6 +36,8 @@ LANDSCAPER_TEST_TENANT=1 ./testing/04-upload-target-env.sh
 | `08-upload-errors.sh` | no* | Missing `--target-env`, unknown environment, bad paths, undeclared artifact |
 | `09-cleanup.sh` | no | Restores the fixture and removes the scratch directory |
 | `12-deploy-status.sh` | **writes, deploys** | `--wait`, the exit codes, `--output json`, and the error information for a flow that cannot be deployed |
+| `13-design-guidelines.sh` | **writes** | `artifact guidelines`: the JSON document, `--fail-on` and exit code 7, a declared `guidelineSkips` entry, skip and unskip, an essential rule refused, the rule list |
+| `14-package-copy-delete.sh` | **writes, deploys, deletes** | `package copy` exit codes and JSON, download of an editable and a configure only SAP package, `package delete` guards (unknown, declared, no `--yes`, deployed), `--dry-run` without writes, `--undeploy` |
 | `11-logging.sh` | no | `--log`: off by default, JSON Lines output, `--log-dir`, file permissions, no credential in the file, a failed run recorded as failed |
 | `10-download.sh` | **reads** | `artifact download`: the folder layout, the version, the skip and `--force` rules, verbatim ids for a suffixed environment, `--download-all` scoping, the flag validation |
 

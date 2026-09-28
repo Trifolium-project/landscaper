@@ -33,6 +33,10 @@ import (
 //Default folder for downloaded artifacts
 const defaultDownloadOutputDir = "artifacts"
 
+//Exit code, when artifacts of a configure only package were requested and
+//nothing else failed
+const exitNotDownloadable = 7
+
 //Version of an artifact, that the tenant holds as a draft
 const draftVersion = "Active"
 
@@ -60,6 +64,8 @@ type downloadRow struct {
 	Status     string
 	Path       string
 	Failed     bool
+	//The package is configure only, SAP does not hand out its content
+	NotDownloadable bool
 }
 
 // downloadCmd represents the artifact download command
@@ -80,9 +86,19 @@ Pass either --packages, or --artifacts, or --download-all. The ids of
 without the environment suffix, which is appended by the command.
 
 Only integration flows are downloaded. Value mappings, message mappings and
-script collections live in other entity sets and are not covered. Packages
-delivered by SAP are skipped by --download-all, because their content cannot be
-downloaded.`,
+script collections live in other entity sets and are not covered.
+
+Packages delivered by SAP can be downloaded when they are editable, which is
+the case for most packages copied from the SAP Business Accelerator Hub with
+"package copy". Configure only (READ_ONLY) packages cannot: --download-all skips
+them, and --packages or --artifacts report every artifact of such a package as
+"not downloadable (configure-only SAP package)" and exit with 7.
+
+Exit codes:
+
+  0  everything was downloaded or skipped as existing
+  7  nothing failed, but artifacts of a configure only package were requested
+  1  an artifact could not be downloaded`,
 	Run: func(cmd *cobra.Command, args []string) {
 		artifactDownload()
 	},
@@ -134,21 +150,60 @@ func artifactDownload() {
 
 			//The audit log carries the same status vocabulary as the table
 			auditItem(map[string]interface{}{
-				"operation": "download",
-				"artifact":  row.ArtifactId,
-				"package":   row.PackageId,
-				"version":   row.Version,
-				"status":    row.Status,
-				"path":      row.Path,
-				"failed":    row.Failed,
+				"operation":        "download",
+				"artifact":         row.ArtifactId,
+				"package":          row.PackageId,
+				"version":          row.Version,
+				"status":           row.Status,
+				"path":             row.Path,
+				"failed":           row.Failed,
+				"not_downloadable": row.NotDownloadable,
 			})
 		}
 		writer.Flush()
 	}
 
+	rows = downloadTargets(environment_, targets, outputDir)
+
+	flush()
+
+	switch downloadExitCode(rows) {
+	case exitFailure:
+		failed := 0
+		for _, row := range rows {
+			if row.Failed {
+				failed++
+			}
+		}
+		log.Fatalf("%d of %d artifacts could not be downloaded", failed, len(rows))
+	case exitNotDownloadable:
+		notDownloadable := 0
+		for _, row := range rows {
+			if row.NotDownloadable {
+				notDownloadable++
+			}
+		}
+		log.Printf("%d of %d artifacts belong to a configure only SAP package and cannot be downloaded", notDownloadable, len(rows))
+		exitWith(exitNotDownloadable)
+	}
+}
+
+//downloadTargets downloads every target and reports one row per artifact
+func downloadTargets(environment *landscape.Environment, targets []downloadTarget, outputDir string) []*downloadRow {
+
+	rows := []*downloadRow{}
+	client := environment.System.Client
+
 	for _, target := range targets {
 
-		artifacts, err := environment_.System.Client.ReadIntegrationDesigntimeArtifacts(target.PackageId, false)
+		//SAP refuses the content of a configure only package, with 400 "Cannot
+		//download the artifact from a configure only package", so none is asked for
+		readOnly := false
+		if integrationPackage, err := client.ReadIntegrationPackageStatus(target.PackageId); err == nil {
+			readOnly = integrationPackage.Mode == cpiclient.PackageModeReadOnly
+		}
+
+		artifacts, err := client.ReadIntegrationDesigntimeArtifacts(target.PackageId, false)
 		if err != nil {
 			rows = append(rows, &downloadRow{
 				ArtifactId: "-",
@@ -161,21 +216,32 @@ func artifactDownload() {
 			continue
 		}
 
-		rows = append(rows, downloadPackageArtifacts(environment_, target, artifacts, outputDir)...)
+		if readOnly {
+			rows = append(rows, notDownloadableRows(target, artifacts)...)
+			continue
+		}
+
+		rows = append(rows, downloadPackageArtifacts(environment, target, artifacts, outputDir)...)
 	}
 
-	flush()
+	return rows
+}
 
-	failed := 0
+//downloadExitCode: a failure beats a configure only package, which beats success
+func downloadExitCode(rows []*downloadRow) int {
+	notDownloadable := false
 	for _, row := range rows {
 		if row.Failed {
-			failed++
+			return exitFailure
+		}
+		if row.NotDownloadable {
+			notDownloadable = true
 		}
 	}
-
-	if failed > 0 {
-		log.Fatalf("%d of %d artifacts could not be downloaded", failed, len(rows))
+	if notDownloadable {
+		return exitNotDownloadable
 	}
+	return exitDeployed
 }
 
 //validateDownloadFlags enforces that exactly one way of selecting artifacts is
@@ -283,6 +349,28 @@ func resolveDownloadTargets(environment *landscape.Environment) ([]downloadTarge
 	}
 
 	return ordered, nil
+}
+
+//notDownloadableRows reports the requested artifacts of a configure only
+//package, without asking the tenant for their content
+func notDownloadableRows(target downloadTarget, artifacts []*cpiclient.IntegrationDesigntimeArtifact) []*downloadRow {
+
+	rows := []*downloadRow{}
+	for _, integrationArtifact := range artifacts {
+		if len(target.ArtifactIds) > 0 && !util.Contains(target.ArtifactIds, integrationArtifact.Id) {
+			continue
+		}
+		rows = append(rows, &downloadRow{
+			ArtifactId:      integrationArtifact.Id,
+			PackageId:       target.PackageId,
+			Version:         integrationArtifact.Version,
+			Status:          "not downloadable (configure-only SAP package)",
+			Path:            "-",
+			NotDownloadable: true,
+		})
+	}
+
+	return rows
 }
 
 //downloadPackageArtifacts downloads the requested artifacts of one package and
