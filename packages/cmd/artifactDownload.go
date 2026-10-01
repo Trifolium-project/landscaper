@@ -193,6 +193,14 @@ func downloadTargets(environment *landscape.Environment, targets []downloadTarge
 
 	rows := []*downloadRow{}
 	client := environment.System.Client
+	type preparedTarget struct {
+		target downloadTarget
+		artifacts []*cpiclient.IntegrationDesigntimeArtifact
+		readOnly bool
+		err error
+	}
+	prepared := make([]preparedTarget, 0, len(targets))
+	progressDone, progressTotal = 0, 0
 
 	for _, target := range targets {
 
@@ -204,24 +212,59 @@ func downloadTargets(environment *landscape.Environment, targets []downloadTarge
 		}
 
 		artifacts, err := client.ReadIntegrationDesigntimeArtifacts(target.PackageId, false)
+		prepared = append(prepared, preparedTarget{target, artifacts, readOnly, err})
 		if err != nil {
-			rows = append(rows, &downloadRow{
+			progressTotal++
+			continue
+		}
+		found := map[string]bool{}
+		for _, artifact := range artifacts {
+			if len(target.ArtifactIds) == 0 || util.Contains(target.ArtifactIds, artifact.Id) {
+				progressTotal++
+				found[artifact.Id] = true
+			}
+		}
+		if !readOnly {
+			for _, id := range target.ArtifactIds {
+				if !found[id] {
+					progressTotal++
+				}
+			}
+		}
+	}
+
+	emitRow := func(row *downloadRow) {
+		emitProgress(map[string]interface{}{
+			"artifact": row.ArtifactId, "package": row.PackageId,
+			"status": row.Status, "failed": row.Failed,
+			"not_downloadable": row.NotDownloadable,
+		})
+	}
+	for _, entry := range prepared {
+		target, artifacts, readOnly, err := entry.target, entry.artifacts, entry.readOnly, entry.err
+		if err != nil {
+			row := &downloadRow{
 				ArtifactId: "-",
 				PackageId:  target.PackageId,
 				Version:    "-",
 				Status:     fmt.Sprintf("failed: package cannot be read: %s", singleLine(err.Error())),
 				Path:       "-",
 				Failed:     true,
-			})
+			}
+			rows = append(rows, row)
+			emitRow(row)
 			continue
 		}
 
 		if readOnly {
-			rows = append(rows, notDownloadableRows(target, artifacts)...)
+			for _, row := range notDownloadableRows(target, artifacts) {
+				rows = append(rows, row)
+				emitRow(row)
+			}
 			continue
 		}
 
-		rows = append(rows, downloadPackageArtifacts(environment, target, artifacts, outputDir)...)
+		rows = append(rows, downloadPackageArtifactsWithProgress(environment, target, artifacts, outputDir, emitRow)...)
 	}
 
 	return rows
@@ -377,7 +420,11 @@ func notDownloadableRows(target downloadTarget, artifacts []*cpiclient.Integrati
 //reports one row per artifact. A failing artifact does not stop the others.
 func downloadPackageArtifacts(environment *landscape.Environment, target downloadTarget,
 	artifacts []*cpiclient.IntegrationDesigntimeArtifact, outputDir string) []*downloadRow {
+	return downloadPackageArtifactsWithProgress(environment, target, artifacts, outputDir, nil)
+}
 
+func downloadPackageArtifactsWithProgress(environment *landscape.Environment, target downloadTarget,
+	artifacts []*cpiclient.IntegrationDesigntimeArtifact, outputDir string, onRow func(*downloadRow)) []*downloadRow {
 	rows := []*downloadRow{}
 	found := map[string]bool{}
 
@@ -400,6 +447,9 @@ func downloadPackageArtifacts(environment *landscape.Environment, target downloa
 			}
 		}
 		rows = append(rows, row)
+		if onRow != nil {
+			onRow(row)
+		}
 	}
 
 	//An explicitly requested artifact, that the package does not hold, is an
@@ -408,14 +458,18 @@ func downloadPackageArtifacts(environment *landscape.Environment, target downloa
 		if found[artifactId] {
 			continue
 		}
-		rows = append(rows, &downloadRow{
+		row := &downloadRow{
 			ArtifactId: artifactId,
 			PackageId:  target.PackageId,
 			Version:    "-",
 			Status:     "failed: artifact is not in the package",
 			Path:       "-",
 			Failed:     true,
-		})
+		}
+		rows = append(rows, row)
+		if onRow != nil {
+			onRow(row)
+		}
 	}
 
 	return rows

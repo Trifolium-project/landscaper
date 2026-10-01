@@ -17,8 +17,11 @@ package cmd
 
 import (
 	"fmt"
+	"encoding/json"
 	"log"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/Trifolium-project/landscaper/packages/auditlog"
 	"github.com/Trifolium-project/landscaper/packages/landscape"
@@ -45,7 +48,13 @@ var (
 	artifact 	*string
 	logEnabled  *bool
 	logDir      *string
+	logFile     *string
+	runID       *string
+	progressMode *string
 )
+var progressDone int
+var progressTotal int
+var progressCommand string
 
 //Audit log of the run. Nil means logging is off, which is the default, and
 //every method of the logger is safe to call on a nil value.
@@ -73,7 +82,7 @@ func Execute() {
 	//tenant answers a token fetch with anything but 2xx.
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			auditLogger.RunEnd("panic", fmt.Sprint(recovered))
+			auditLogger.RunEndWithExit("panic", fmt.Sprint(recovered), 1)
 			auditLogger.Close()
 			panic(recovered)
 		}
@@ -81,12 +90,12 @@ func Execute() {
 
 	err := rootCmd.Execute()
 	if err != nil {
-		auditLogger.RunEnd("failed", err.Error())
+		auditLogger.RunEndWithExit("failed", err.Error(), 1)
 		auditLogger.Close()
 		os.Exit(1)
 	}
 
-	auditLogger.RunEnd("ok", "")
+	auditLogger.RunEndWithExit("ok", "", 0)
 	auditLogger.Close()
 }
 
@@ -106,6 +115,9 @@ func init() {
 
 	logEnabled = rootCmd.PersistentFlags().Bool("log", false, "Write an audit log of the run, including every call to the tenant")
 	logDir = rootCmd.PersistentFlags().String("log-dir", defaultLogDir, "Folder for the audit log")
+	logFile = rootCmd.PersistentFlags().String("log-file", "", "Write the audit log to this exact file")
+	runID = rootCmd.PersistentFlags().String("run-id", "", "Caller run ID (or LANDSCAPER_RUN_ID)")
+	progressMode = rootCmd.PersistentFlags().String("progress", "", "Progress stream on stderr: json")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -197,7 +209,7 @@ func exitWith(code int) {
 	if code != 0 {
 		status = "failed"
 	}
-	auditLogger.RunEnd(status, fmt.Sprintf("exit code %d", code))
+	auditLogger.RunEndWithExit(status, fmt.Sprintf("exit code %d", code), code)
 	auditLogger.Close()
 
 	os.Exit(code)
@@ -208,7 +220,7 @@ func exitWith(code int) {
 //operation without one is worse than not performing it.
 func startAuditLog() {
 
-	if logEnabled == nil || !*logEnabled {
+	if (logEnabled == nil || !*logEnabled) && (logFile == nil || *logFile == "") {
 		return
 	}
 
@@ -217,17 +229,42 @@ func startAuditLog() {
 		directory = *logDir
 	}
 
-	logger, err := auditlog.New(directory)
+	var logger *auditlog.Logger
+	var err error
+	if logFile != nil && *logFile != "" {
+		logger, err = auditlog.NewAt(*logFile)
+	} else {
+		logger, err = auditlog.New(directory)
+	}
 	if err != nil {
 		log.Fatalln(err)
 	}
 	auditLogger = logger
+	selectedRunID := os.Getenv("LANDSCAPER_RUN_ID")
+	if runID != nil && *runID != "" {
+		selectedRunID = *runID
+	}
+	auditLogger.SetContext(selectedRunID, os.Getenv("TRACEPARENT"))
 
 	//Everything the program already writes with the standard logger, including
 	//all of the log.Fatalln exits, is recorded without changing those callers
 	log.SetOutput(auditLogger.LogWriter(os.Stderr))
 
-	fmt.Printf("Writing the audit log to %s\n", auditLogger.Path())
+	notice := fmt.Sprintf("Writing the audit log to %s\n", auditLogger.Path())
+	if jsonOutputRequested() {
+		fmt.Fprint(os.Stderr, notice)
+	} else {
+		fmt.Print(notice)
+	}
+}
+
+func jsonOutputRequested() bool {
+	for index, arg := range os.Args {
+		if arg == "--output=json" || (arg == "--output" && index+1 < len(os.Args) && os.Args[index+1] == "json") {
+			return true
+		}
+	}
+	return false
 }
 
 //recordRunStart writes the command and the parameters it was given. It runs as
@@ -235,7 +272,11 @@ func startAuditLog() {
 //or to the flags that were actually set.
 func recordRunStart(cmd *cobra.Command) {
 
-	if auditLogger == nil || cmd == nil {
+	if cmd == nil {
+		return
+	}
+	progressCommand = strings.TrimPrefix(cmd.CommandPath(), "landscaper ")
+	if auditLogger == nil {
 		return
 	}
 
@@ -256,4 +297,40 @@ func recordRunStart(cmd *cobra.Command) {
 //logging is off, and safe in tests, where initConfig never runs.
 func auditItem(fields map[string]interface{}) {
 	auditLogger.Item(fields)
+	if progressCommand == "artifact download" {
+		return //download emits rows as each artifact finishes
+	}
+	emitProgress(fields)
+}
+
+func emitProgress(fields map[string]interface{}) {
+	if progressMode == nil || *progressMode != "json" {
+		return
+	}
+	progressDone++
+	total := progressTotal
+	if total < progressDone {
+		total = progressDone
+	}
+	status, _ := fields["status"].(string)
+	outcome := "ok"
+	if failed, _ := fields["failed"].(bool); failed || strings.HasPrefix(status, "failed") {
+		outcome = "failed"
+	} else if skipped, _ := fields["not_downloadable"].(bool); skipped || strings.HasPrefix(status, "skipped") {
+		outcome = "skipped"
+	}
+	item := fmt.Sprint(fields["artifact"])
+	if pkg, ok := fields["package"].(string); ok && pkg != "" {
+		item = pkg + "/" + item
+	}
+	id := os.Getenv("LANDSCAPER_RUN_ID")
+	if runID != nil && *runID != "" {
+		id = *runID
+	}
+	line, _ := json.Marshal(map[string]interface{}{
+		"type": "progress", "ts": time.Now().UTC().Format(time.RFC3339),
+		"run_id": id, "command": progressCommand, "done": progressDone,
+		"total": total, "item": item, "status": outcome, "bytes": 0,
+	})
+	fmt.Fprintln(os.Stderr, string(line))
 }

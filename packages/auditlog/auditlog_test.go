@@ -81,16 +81,16 @@ func TestEveryRecordIsOneJSONLine(t *testing.T) {
 	logger.RunEnd("ok", "")
 
 	records := readRecords(t, logger.Path())
-	if len(records) != 4 {
-		t.Fatalf("expected 4 records, got %d", len(records))
+	if len(records) != 5 {
+		t.Fatalf("expected 5 records, got %d", len(records))
 	}
 
 	types := []string{}
 	for _, record := range records {
 		types = append(types, record["type"].(string))
 	}
-	if got := strings.Join(types, ","); got != "run,item,log,run" {
-		t.Errorf("types = %q, want %q", got, "run,item,log,run")
+	if got := strings.Join(types, ","); got != "run,item,log,summary,run" {
+		t.Errorf("types = %q, want %q", got, "run,item,log,summary,run")
 	}
 }
 
@@ -101,11 +101,45 @@ func TestRunEndIsWrittenOnlyOnce(t *testing.T) {
 	logger.RunEnd("ok", "second")
 
 	records := readRecords(t, logger.Path())
-	if len(records) != 1 {
-		t.Fatalf("expected 1 record, got %d", len(records))
+	if len(records) != 2 {
+		t.Fatalf("expected 2 records, got %d", len(records))
 	}
-	if records[0]["status"] != "failed" {
-		t.Errorf("status = %v, want %q", records[0]["status"], "failed")
+	if records[1]["status"] != "failed" {
+		t.Errorf("status = %v, want %q", records[1]["status"], "failed")
+	}
+}
+
+func TestCorrelationAndSummary(t *testing.T) {
+	logger := newTestLogger(t)
+	logger.SetContext("run-123", "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01")
+	logger.RunStart("artifact get", "Dev", nil)
+	logger.Item(map[string]interface{}{"artifact": "A", "status": "downloaded"})
+	logger.Item(map[string]interface{}{"artifact": "B", "status": "failed: missing", "failed": true})
+	request, _ := http.NewRequest(http.MethodGet, "https://example.invalid/a", nil)
+	call := logger.StartHTTP(request)
+	call.SetResponse(500, http.Header{}, []byte("error"))
+	call.Flush()
+	logger.RunEndWithExit("failed", "exit code 2", 2)
+
+	records := readRecords(t, logger.Path())
+	for _, record := range records {
+		if record["run_id"] != "run-123" || record["trace_id"] != strings.Repeat("a", 32) {
+			t.Fatalf("missing correlation on %v", record)
+		}
+	}
+	if records[0]["schema"] != float64(1) {
+		t.Fatalf("schema = %v", records[0]["schema"])
+	}
+	summary := records[len(records)-2]
+	if summary["type"] != "summary" || summary["exit_code"] != float64(2) {
+		t.Fatalf("summary = %v", summary)
+	}
+	items := summary["items"].(map[string]interface{})
+	if items["ok"] != float64(1) || items["failed"] != float64(1) {
+		t.Fatalf("items = %v", items)
+	}
+	if records[len(records)-3]["duration_ms"] == nil {
+		t.Fatal("HTTP duration missing")
 	}
 }
 

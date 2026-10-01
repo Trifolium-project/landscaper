@@ -34,6 +34,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -88,6 +89,15 @@ type Logger struct {
 	//Reported once if the file becomes unwritable, straight to stderr,
 	//because this package cannot use the standard logger
 	warnOnce sync.Once
+	runID string
+	traceID string
+	parentSpanID string
+	itemsOK int
+	itemsFailed int
+	itemsSkipped int
+	httpCalls int
+	httpFailed int
+	httpTotalMS int64
 }
 
 //Body is what was sent or received, or a note about why it was left out
@@ -113,13 +123,40 @@ func New(dir string) (*Logger, error) {
 	}
 
 	path := filepath.Join(dir, "landscaper-"+time.Now().Format("20060102-150405")+".log")
+	return NewAt(path)
+}
 
+//NewAt opens an exact audit-log path for callers that need unambiguous ownership.
+func NewAt(path string) (*Logger, error) {
+	if path == "" {
+		return nil, fmt.Errorf("log file is not set")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return nil, fmt.Errorf("unable to create log directory for %s: %s", path, err)
+	}
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
 		return nil, fmt.Errorf("unable to open log file %s: %s", path, err)
 	}
 
 	return &Logger{file: file, path: path, start: time.Now()}, nil
+}
+
+var traceparentPattern = regexp.MustCompile(`^00-([0-9a-f]{32})-([0-9a-f]{16})-[0-9a-f]{2}$`)
+
+//SetContext stamps each record with the caller's run and W3C trace identity.
+func (logger *Logger) SetContext(runID string, traceparent string) {
+	if logger == nil {
+		return
+	}
+	logger.mutex.Lock()
+	defer logger.mutex.Unlock()
+	logger.runID = runID
+	parts := traceparentPattern.FindStringSubmatch(strings.ToLower(traceparent))
+	if len(parts) == 3 && strings.Trim(parts[1], "0") != "" && strings.Trim(parts[2], "0") != "" {
+		logger.traceID = parts[1]
+		logger.parentSpanID = parts[2]
+	}
 }
 
 //Path is the file being written, for the message that tells the user where it is
@@ -142,20 +179,47 @@ func (logger *Logger) Close() error {
 //write marshals one record and writes it as one line. It never returns an
 //error and never logs: a broken audit file must not change what the command
 //does, and reporting through the standard logger would deadlock the tee.
-func (logger *Logger) write(record interface{}) {
+func (logger *Logger) write(record map[string]interface{}) {
 
 	if logger == nil || logger.file == nil {
 		return
 	}
 
+	logger.mutex.Lock()
+	defer logger.mutex.Unlock()
+	if logger.runID != "" {
+		record["run_id"] = logger.runID
+	}
+	if logger.traceID != "" {
+		record["trace_id"] = logger.traceID
+		record["parent_span_id"] = logger.parentSpanID
+	}
+	switch record["type"] {
+	case "item":
+		status, _ := record["status"].(string)
+		failed, _ := record["failed"].(bool)
+		skipped, _ := record["not_downloadable"].(bool)
+		if failed || strings.HasPrefix(status, "failed") {
+			logger.itemsFailed++
+		} else if skipped || strings.HasPrefix(status, "skipped") {
+			logger.itemsSkipped++
+		} else {
+			logger.itemsOK++
+		}
+	case "http":
+		logger.httpCalls++
+		if status, ok := record["status"].(int); ok && status >= 400 || record["error"] != nil {
+			logger.httpFailed++
+		}
+		if duration, ok := record["duration_ms"].(int64); ok {
+			logger.httpTotalMS += duration
+		}
+	}
 	data, err := json.Marshal(record)
 	if err != nil {
 		return
 	}
 	data = append(data, '\n')
-
-	logger.mutex.Lock()
-	defer logger.mutex.Unlock()
 
 	//os.File.Write does not loop, and a record carrying a full response body
 	//can be large enough for a short write to matter. A partial line would
@@ -187,6 +251,7 @@ func (logger *Logger) RunStart(command string, environment string, flags map[str
 		"ts":      timestamp(),
 		"type":    "run",
 		"phase":   "start",
+		"schema":  1,
 		"command": command,
 		"env":     environment,
 		"flags":   flags,
@@ -196,6 +261,15 @@ func (logger *Logger) RunStart(command string, environment string, flags map[str
 //RunEnd records how the run finished. Only the first call is written, so a
 //fatal spotted by the tee does not race the normal end of a command.
 func (logger *Logger) RunEnd(status string, detail string) {
+	exitCode := 1
+	if status == "ok" {
+		exitCode = 0
+	}
+	logger.RunEndWithExit(status, detail, exitCode)
+}
+
+//RunEndWithExit writes summary and final records once, including an exact exit code.
+func (logger *Logger) RunEndWithExit(status string, detail string, exitCode int) {
 
 	if logger == nil {
 		return
@@ -207,14 +281,23 @@ func (logger *Logger) RunEnd(status string, detail string) {
 		return
 	}
 	logger.ended = true
+	itemsOK, itemsFailed, itemsSkipped := logger.itemsOK, logger.itemsFailed, logger.itemsSkipped
+	httpCalls, httpFailed, httpTotalMS := logger.httpCalls, logger.httpFailed, logger.httpTotalMS
 	logger.mutex.Unlock()
 
+	duration := time.Since(logger.start).Milliseconds()
+	logger.write(map[string]interface{}{
+		"ts": timestamp(), "type": "summary",
+		"items": map[string]int{"ok": itemsOK, "failed": itemsFailed, "skipped": itemsSkipped},
+		"http": map[string]interface{}{"calls": httpCalls, "failed": httpFailed, "total_ms": httpTotalMS},
+		"duration_ms": duration, "exit_code": exitCode,
+	})
 	record := map[string]interface{}{
 		"ts":          timestamp(),
 		"type":        "run",
 		"phase":       "end",
 		"status":      status,
-		"duration_ms": time.Since(logger.start).Milliseconds(),
+		"duration_ms": duration,
 	}
 	if detail != "" {
 		record["detail"] = detail
@@ -325,6 +408,7 @@ func (call *HTTPCall) Flush() {
 		"method":          call.method,
 		"url":             call.url,
 		"duration_ms":     time.Since(call.started).Milliseconds(),
+		"attempt":         1,
 		"request_headers": call.requestHeaders,
 	}
 	if call.requestBody != nil {
