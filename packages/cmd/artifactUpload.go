@@ -163,6 +163,7 @@ func artifactUpload(paths []string) {
 				"tenant_version":  row.TenantVersion,
 				"version":         row.UploadVersion,
 				"status":          row.Action,
+				"failed":          row.Status != nil && row.Status.ExitCode() != 0,
 				"deployed":        row.Deployed,
 				"guideline_skips": describeGuidelineSkips(row.GuidelineSkips),
 			})

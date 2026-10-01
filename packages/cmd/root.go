@@ -312,16 +312,14 @@ func emitProgress(fields map[string]interface{}) {
 	if total < progressDone {
 		total = progressDone
 	}
-	status, _ := fields["status"].(string)
-	outcome := "ok"
-	if failed, _ := fields["failed"].(bool); failed || strings.HasPrefix(status, "failed") {
-		outcome = "failed"
-	} else if skipped, _ := fields["not_downloadable"].(bool); skipped || strings.HasPrefix(status, "skipped") {
-		outcome = "skipped"
-	}
-	item := fmt.Sprint(fields["artifact"])
+	outcome := auditlog.ItemOutcome(fields)
+	item, _ := fields["artifact"].(string)
 	if pkg, ok := fields["package"].(string); ok && pkg != "" {
-		item = pkg + "/" + item
+		if item == "" {
+			item = pkg
+		} else {
+			item = pkg + "/" + item
+		}
 	}
 	id := os.Getenv("LANDSCAPER_RUN_ID")
 	if runID != nil && *runID != "" {

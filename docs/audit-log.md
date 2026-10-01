@@ -30,3 +30,15 @@ are `type=progress`, `ts`, `run_id`, `command`, `done`, `total`, `item`,
 the selected artifact metadata first, so `total` stays fixed while downloads proceed.
 The progress stream contains no response bodies or credentials. JSON command output
 on stdout remains a single JSON document; the audit-log path notice goes to stderr.
+
+Progress and summary records use the same item outcome rules. Explicit failures,
+deployment failures, missing items, blocked package deletes, and guideline violations
+count as failed. Existing, cancelled, planned, dry-run, and unsupported items count as
+skipped. Other completed items count as ok. Guideline warnings without violations
+do not count as failures. Standalone deployment also writes an item record.
+Package-only progress uses the package ID, not an empty artifact placeholder.
+
+Outside bulk artifact download, the total can grow as item records are produced.
+Only bulk artifact download promises a fixed total known before the first item.
+On Windows, protect the log directory with appropriate ACLs; POSIX permission
+bits do not establish Windows access controls.

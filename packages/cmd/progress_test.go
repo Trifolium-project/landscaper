@@ -30,6 +30,7 @@ func TestJSONProgressEmitter(t *testing.T) {
 	progressDone, progressTotal, progressCommand = 0, 2, "artifact download"
 	emitProgress(map[string]interface{}{"package": "PKG", "artifact": "ONE", "status": "ok"})
 	emitProgress(map[string]interface{}{"package": "PKG", "artifact": "TWO", "status": "failed", "failed": true})
+	emitProgress(map[string]interface{}{"package": "PKG", "status": "cancelled", "body": "PRIVATE"})
 	writer.Close()
 	data, err := io.ReadAll(reader)
 	if err != nil {
@@ -43,7 +44,7 @@ func TestJSONProgressEmitter(t *testing.T) {
 		}
 		lines = append(lines, item)
 	}
-	if len(lines) != 2 || lines[0]["done"] != float64(1) || lines[1]["done"] != float64(2) {
+	if len(lines) != 3 || lines[0]["done"] != float64(1) || lines[1]["done"] != float64(2) {
 		t.Fatalf("unexpected progress sequence: %v", lines)
 	}
 	if lines[0]["total"] != float64(2) || lines[1]["total"] != float64(2) {
@@ -51,5 +52,8 @@ func TestJSONProgressEmitter(t *testing.T) {
 	}
 	if lines[1]["status"] != "failed" || lines[1]["item"] != "PKG/TWO" || lines[1]["run_id"] != id {
 		t.Fatalf("unexpected final progress: %v", lines[1])
+	}
+	if lines[2]["item"] != "PKG" || lines[2]["status"] != "skipped" || bytes.Contains(data, []byte("PRIVATE")) {
+		t.Fatalf("invalid package-only progress or payload leak: %s", data)
 	}
 }

@@ -80,6 +80,7 @@ func artifactDeploy() {
 
 	err = system.Client.DeployIntegrationDesigntimeArtifact(artfct.Id, artfct.Version)
 	if err != nil {
+		auditItem(map[string]interface{}{"operation": "artifact-deploy", "package": artfct.PackageId, "artifact": artfct.Id, "status": "failed", "failed": true})
 		log.Fatalln(err)
 	}
 	
@@ -93,6 +94,7 @@ func artifactDeploy() {
 	fmt.Fprintf(writer, "%s\t%s\n", "Package:", artfct.PackageId)
 
 	if deployWait == nil || !*deployWait {
+		auditItem(map[string]interface{}{"operation": "artifact-deploy", "package": artfct.PackageId, "artifact": artfct.Id, "status": "requested"})
 		writer.Flush()
 		return
 	}
@@ -100,6 +102,7 @@ func artifactDeploy() {
 	//The tenant keeps reporting the previous version as STARTED for a while
 	//after a redeploy, so the wait only accepts the version just deployed
 	status := waitForDeployment(system.Client, artfct.Id, artfct.Version, *deployTimeout, *deployInterval)
+	auditItem(map[string]interface{}{"operation": "artifact-deploy", "package": artfct.PackageId, "artifact": artfct.Id, "status": status.Summary(), "failed": status.ExitCode() != 0})
 
 	fmt.Fprintf(writer, "%s\t%s\n", "Runtime Status:", status.Summary())
 	if status.ErrorText != "" {

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -140,6 +141,41 @@ func TestCorrelationAndSummary(t *testing.T) {
 	}
 	if records[len(records)-3]["duration_ms"] == nil {
 		t.Fatal("HTTP duration missing")
+	}
+}
+
+func TestItemOutcome(t *testing.T) {
+	tests := []struct {
+		name string
+		fields map[string]interface{}
+		want string
+	}{
+		{"download", map[string]interface{}{"status": "downloaded"}, "ok"},
+		{"deployment error", map[string]interface{}{"status": "started", "failed": true}, "failed"},
+		{"missing", map[string]interface{}{"status": "not-found"}, "failed"},
+		{"timeout", map[string]interface{}{"status": "not-finished"}, "failed"},
+		{"violations", map[string]interface{}{"status": "not-compliant", "violations": 2}, "failed"},
+		{"warnings only", map[string]interface{}{"status": "not-compliant", "violations": 0}, "ok"},
+		{"delete blocked", map[string]interface{}{"operation": "package-delete", "status": "deployed"}, "failed"},
+		{"already exists", map[string]interface{}{"status": "exists"}, "skipped"},
+		{"dry run", map[string]interface{}{"status": "dry-run"}, "skipped"},
+		{"cancelled", map[string]interface{}{"status": "cancelled"}, "skipped"},
+		{"unsupported", map[string]interface{}{"not_downloadable": true}, "skipped"},
+	}
+	logger := newTestLogger(t)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := ItemOutcome(test.fields); got != test.want {
+				t.Fatalf("outcome = %q, want %q", got, test.want)
+			}
+		})
+		logger.Item(test.fields)
+	}
+	logger.RunEnd("failed", "")
+	records := readRecords(t, logger.Path())
+	items := records[len(records)-2]["items"].(map[string]interface{})
+	if items["ok"] != float64(2) || items["failed"] != float64(5) || items["skipped"] != float64(4) {
+		t.Fatalf("summary outcomes differ: %v", items)
 	}
 }
 
@@ -381,8 +417,34 @@ func TestNewRejectsAnUnusableDirectory(t *testing.T) {
 	}
 }
 
+func TestNewAtUsesExactPathAndPreservesExistingRecords(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "owned.jsonl")
+	first, err := NewAt(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.Message("info", "first")
+	first.Close()
+	second, err := NewAt(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer second.Close()
+	second.Message("info", "second")
+	if second.Path() != path {
+		t.Fatalf("path = %q, want %q", second.Path(), path)
+	}
+	records := readRecords(t, path)
+	if len(records) != 2 || records[0]["msg"] != "first" || records[1]["msg"] != "second" {
+		t.Fatalf("existing records lost: %v", records)
+	}
+}
+
 //The log file holds complete tenant responses, so it must not be world readable
 func TestLogFileIsNotWorldReadable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission modes are not implemented on Windows; directory ACLs apply")
+	}
 	logger := newTestLogger(t)
 
 	info, err := os.Stat(logger.Path())

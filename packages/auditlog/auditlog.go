@@ -196,12 +196,9 @@ func (logger *Logger) write(record map[string]interface{}) {
 	}
 	switch record["type"] {
 	case "item":
-		status, _ := record["status"].(string)
-		failed, _ := record["failed"].(bool)
-		skipped, _ := record["not_downloadable"].(bool)
-		if failed || strings.HasPrefix(status, "failed") {
+		if ItemOutcome(record) == "failed" {
 			logger.itemsFailed++
-		} else if skipped || strings.HasPrefix(status, "skipped") {
+		} else if ItemOutcome(record) == "skipped" {
 			logger.itemsSkipped++
 		} else {
 			logger.itemsOK++
@@ -306,8 +303,34 @@ func (logger *Logger) RunEndWithExit(status string, detail string, exitCode int)
 	logger.write(record)
 }
 
-//Item records the outcome of one artifact or package, using the same status
-//vocabulary the command prints in its table
+//ItemOutcome classifies command fields consistently for summary and progress.
+func ItemOutcome(fields map[string]interface{}) string {
+	status, _ := fields["status"].(string)
+	status = strings.ToLower(status)
+	failed, _ := fields["failed"].(bool)
+	skipped, _ := fields["not_downloadable"].(bool)
+	errorText, _ := fields["error"].(string)
+	if failed || errorText != "" || strings.Contains(status, "failed") || status == "error" ||
+		status == "not-found" || status == "not-finished" || status == "not-executed" {
+		return "failed"
+	}
+	if status == "not-compliant" {
+		if violations, _ := fields["violations"].(int); violations > 0 {
+			return "failed"
+		}
+	}
+	if operation, _ := fields["operation"].(string); operation == "package-delete" &&
+		(status == "deployed" || status == "declared") {
+		return "failed"
+	}
+	if skipped || strings.HasPrefix(status, "skipped") || status == "exists" ||
+		status == "cancelled" || status == "dry-run" || status == "kept" || status == "planned" {
+		return "skipped"
+	}
+	return "ok"
+}
+
+//Item records the outcome of one artifact or package.
 func (logger *Logger) Item(fields map[string]interface{}) {
 
 	if logger == nil || fields == nil {

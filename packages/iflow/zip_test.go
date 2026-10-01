@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"testing"
 )
@@ -448,7 +449,7 @@ func TestUnzipToDirCreatesReadableFolders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if info.Mode().Perm() != 0755 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0755 {
 		t.Errorf("folder mode = %v, want %v", info.Mode().Perm(), os.FileMode(0755))
 	}
 
@@ -456,7 +457,7 @@ func TestUnzipToDirCreatesReadableFolders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if file.Mode().Perm() != 0644 {
+	if runtime.GOOS != "windows" && file.Mode().Perm() != 0644 {
 		t.Errorf("file mode = %v, want %v", file.Mode().Perm(), os.FileMode(0644))
 	}
 }
