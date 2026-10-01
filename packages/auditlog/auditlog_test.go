@@ -417,6 +417,32 @@ func TestNewRejectsAnUnusableDirectory(t *testing.T) {
 	}
 }
 
+func TestItemOutcomeAfterJSONDecode(t *testing.T) {
+	for _, useNumber := range []bool{false, true} {
+		for _, count := range []int{0, 2} {
+			encoded, err := json.Marshal(map[string]interface{}{"status": "not-compliant", "violations": count})
+			if err != nil {
+				t.Fatal(err)
+			}
+			decoder := json.NewDecoder(bytes.NewReader(encoded))
+			if useNumber {
+				decoder.UseNumber()
+			}
+			var fields map[string]interface{}
+			if err := decoder.Decode(&fields); err != nil {
+				t.Fatal(err)
+			}
+			want := "ok"
+			if count > 0 {
+				want = "failed"
+			}
+			if got := ItemOutcome(fields); got != want {
+				t.Fatalf("UseNumber=%t violations=%d: got %s want %s", useNumber, count, got, want)
+			}
+		}
+	}
+}
+
 func TestNewAtUsesExactPathAndPreservesExistingRecords(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nested", "owned.jsonl")
 	first, err := NewAt(path)

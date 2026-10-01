@@ -315,7 +315,19 @@ func ItemOutcome(fields map[string]interface{}) string {
 		return "failed"
 	}
 	if status == "not-compliant" {
-		if violations, _ := fields["violations"].(int); violations > 0 {
+		//JSON readers decode numbers as float64, or json.Number with UseNumber.
+		violations := float64(0)
+		switch value := fields["violations"].(type) {
+		case int:
+			violations = float64(value)
+		case int64:
+			violations = float64(value)
+		case float64:
+			violations = value
+		case json.Number:
+			violations, _ = value.Float64()
+		}
+		if violations > 0 {
 			return "failed"
 		}
 	}

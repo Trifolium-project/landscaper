@@ -42,3 +42,12 @@ Outside bulk artifact download, the total can grow as item records are produced.
 Only bulk artifact download promises a fixed total known before the first item.
 On Windows, protect the log directory with appropriate ACLs; POSIX permission
 bits do not establish Windows access controls.
+
+Command-level contracts are covered by subprocess tests against a local TLS
+tenant in packages/cmd/observabilityCLI_test.go. They exercise real CLI parsing
+and process exits for get, copy, delete, download, deployment, guidelines, and
+help, including exact log paths, JSON stdout, correlation, and progress/summary
+agreement. ItemOutcome accepts native and JSON-decoded numeric violation counts.
+These tests do not call a live SAP tenant. The six package suites, vet, and build
+also pass on Linux (Go 1.26.8, read-only source mount), including POSIX permission
+assertions and the 23 CLI scenarios.
