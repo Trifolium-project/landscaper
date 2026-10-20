@@ -17,9 +17,10 @@ Below you can find zoomed example of CPI landscape. It can contain multiple "env
 
 0. Install landscaper
 
-Every release ships one asset, `landscaper.zip`, holding a static binary for each
-platform. There is nothing to compile and no runtime to install - pick your
-binary out of the archive, make it executable and put it on your `PATH`.
+Every [release](https://github.com/Trifolium-project/landscaper/releases) ships
+one asset, `landscaper.zip`, holding a static binary for each platform. There is
+nothing to compile and no runtime to install - pick your binary out of the
+archive, make it executable and put it on your `PATH`.
 
 | Platform | Binary in the archive |
 |---|---|
@@ -34,15 +35,17 @@ ARM build, `x86_64` means the amd64 one.
 
 **Releases are marked as pre-release, so there is no "latest" download URL** -
 `/releases/latest/download/...` returns 404. Install a version by name, or let
-the commands below look the newest one up.
+the commands below look the newest one up. They read the releases feed rather
+than the GitHub API, whose limit of 60 anonymous requests per hour is quickly
+used up behind a shared company IP.
 
 <details open>
 <summary><b>macOS</b></summary>
 
 ```bash
 # Newest release, Apple Silicon. Use landscaper-darwin-amd64 on an Intel Mac.
-VERSION=$(curl -s https://api.github.com/repos/Trifolium-project/landscaper/releases | grep -m1 '"tag_name"' | cut -d'"' -f4)
-curl -L -o landscaper.zip "https://github.com/Trifolium-project/landscaper/releases/download/$VERSION/landscaper.zip"
+VERSION=$(curl -fsSL https://github.com/Trifolium-project/landscaper/releases.atom | grep -o 'releases/tag/[^"]*' | head -1 | cut -d/ -f3)
+curl -fL -o landscaper.zip "https://github.com/Trifolium-project/landscaper/releases/download/${VERSION:?release lookup failed}/landscaper.zip"
 
 unzip -o landscaper.zip
 sudo install -m 755 build/landscaper-darwin-arm64 /usr/local/bin/landscaper
@@ -68,8 +71,8 @@ Downloading with `curl`, as above, does not set that flag in the first place.
 
 ```bash
 # Newest release, x86-64. Use landscaper-linux-arm64 on ARM.
-VERSION=$(curl -s https://api.github.com/repos/Trifolium-project/landscaper/releases | grep -m1 '"tag_name"' | cut -d'"' -f4)
-curl -L -o landscaper.zip "https://github.com/Trifolium-project/landscaper/releases/download/$VERSION/landscaper.zip"
+VERSION=$(curl -fsSL https://github.com/Trifolium-project/landscaper/releases.atom | grep -o 'releases/tag/[^"]*' | head -1 | cut -d/ -f3)
+curl -fL -o landscaper.zip "https://github.com/Trifolium-project/landscaper/releases/download/${VERSION:?release lookup failed}/landscaper.zip"
 
 unzip -o landscaper.zip
 sudo install -m 755 build/landscaper-linux-amd64 /usr/local/bin/landscaper
@@ -92,8 +95,9 @@ export PATH="$HOME/.local/bin:$PATH"   # add to ~/.bashrc to make it permanent
 
 ```powershell
 # Newest release
-$version = (Invoke-RestMethod https://api.github.com/repos/Trifolium-project/landscaper/releases)[0].tag_name
-Invoke-WebRequest "https://github.com/Trifolium-project/landscaper/releases/download/$version/landscaper.zip" -OutFile landscaper.zip
+$feed = [xml](Invoke-WebRequest -UseBasicParsing https://github.com/Trifolium-project/landscaper/releases.atom).Content
+$version = @($feed.feed.entry)[0].link.href.Split('/')[-1]
+Invoke-WebRequest -UseBasicParsing "https://github.com/Trifolium-project/landscaper/releases/download/$version/landscaper.zip" -OutFile landscaper.zip
 
 Expand-Archive landscaper.zip -DestinationPath . -Force
 New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Programs\landscaper" | Out-Null
@@ -112,11 +116,18 @@ landscaper --help
 </details>
 
 Installing a **specific version** is the same commands with the lookup replaced
-by the tag you want:
+by the tag you want, as listed on the
+[releases page](https://github.com/Trifolium-project/landscaper/releases):
 
 ```bash
-curl -L -o landscaper.zip https://github.com/Trifolium-project/landscaper/releases/download/v0.6.0/landscaper.zip
+curl -fL -o landscaper.zip https://github.com/Trifolium-project/landscaper/releases/download/v0.8.0/landscaper.zip
 ```
+
+If `unzip` fails with *"End-of-central-directory signature not found"*, the file
+is not the archive but an error page saved under its name - check with
+`ls -l landscaper.zip` (the archive is about 44 MB) and `head -c 100 landscaper.zip`.
+The usual cause is a `/releases/latest/...` URL or an empty version from a failed
+lookup; `curl -f`, as above, fails instead of saving the page.
 
 `landscaper` has no self-update and no `--version` flag; to upgrade, repeat the
 install and overwrite the binary. To uninstall, delete it - the tool writes
@@ -350,8 +361,8 @@ landscaper artifact list --pkg=SAPAribaAnalyticalReportingIntegrationwithThirdPa
 ```
 
 ```bash
-#	ArtefactId				Version	Package							Deploy Status	Deployed Version
-1	Generic_Report_Content_GenerationQA	1.0.2	SAPAribaAnalyticalReportingIntegrationwithThirdPartyQA	STARTED		1.0.2
+#	ArtefactId				Version	Package							Deploy Status	Deployed Version	Type
+1	Generic_Report_Content_GenerationQA	1.0.2	SAPAribaAnalyticalReportingIntegrationwithThirdPartyQA	STARTED		1.0.2			Integration Flow
 
 ```
 
@@ -709,6 +720,8 @@ Each system have next parameters:
  - host - hostname of the SAP CPI tenant
  - login - environment variable, which contains username(S-user). This user should have an access to Cloud Platform Integration API.
  - password - environment variable, which contains password for provided usernamу
+ - uiHost - optional, design time host of the Integration Suite web UI (the address in the browser, `https://` and path may be included), literally or as an environment variable. Only needed for [MCP servers](#mcp-servers)
+ - uiCookie - optional, environment variable, which contains a browser session of the Integration Suite web UI. Only needed for [MCP servers](#mcp-servers)
 
 Credentials cannot be set directly in landscape file due to security reasons. Please use environment variables, or [.env](./example.env) file. If credentials are not provided, landscaper will ask username and password for each system in interactive way.
 
@@ -947,6 +960,123 @@ if [ -n "$id" ]; then
   landscaper artifact download --packages "$id" --env Dev --output refs/sap   #7: configure only
   landscaper package delete --pkg "$id" --env Dev --yes --output json
 fi
+```
+
+## MCP servers
+
+SAP Integration Suite has an artifact type **MCP Server** (Integration Package -> Add -> MCP Server, runtime profile
+Integration Cell). The Cloud Integration OData API does **not** expose it: `/api/v1/$metadata` declares no entity set for
+it, `IntegrationDesigntimeArtifacts` of a package that holds only MCP servers is empty, and a deployed server is not in
+`IntegrationRuntimeArtifacts`. The Integration Suite web UI reaches MCP servers through its own, undocumented API on the
+design time host, and that API accepts **a logged-in browser session only** - an OAuth client credentials token is
+answered with the login page.
+
+landscaper therefore reads MCP servers with a browser session that you copy from the UI. This is meant for interactive
+use: the session expires after about 30 minutes without activity, so it does not work in a pipeline.
+
+What works today:
+
+| Command | MCP servers |
+|---|---|
+| `artifact list` | Listed with the type `MCP Server` and the status of the Integration Cell runtime |
+| `artifact download` | Exported and extracted into `<output>/<package>/<server id>/`, the same layout as an iFlow |
+| `artifact deploy --pkg <package> --artifact <id> [--wait]` | Deploys the saved state to the runtime and virtual host of its manifest. `--wait` reads the deployment task: `SUCCESS` is `STARTED` (exit 0), `FAIL` is `ERROR` (exit 2) |
+| `artifact undeploy --artifact <id>` | Removes the server from the Integration Cell |
+| `artifact upload <folder> [--deploy --wait]` | Creates a missing server, then writes the folder onto its editor model and saves it, see below |
+| `init` | Not written: `init` declares an artifact only for its parameters, and MCP servers have none it could read |
+
+The tenant has **no import** for MCP servers. `artifact upload` therefore creates a missing server from its OpenAPI
+definition (the call of the UI wizard) and then rewrites the editor model of the server from the folder and saves it:
+name, descriptions, OpenAPI, target URL, MCP path, tools with their schemas, resources, prompts and every property of
+the integration flow. On a suffixed environment the suffix is appended to id and name **without a space** - a server
+name may hold letters, digits and underscores only. `mcpPath` and `targetURL` are the only configuration parameters:
+
+```yaml
+    - id: MCPservers
+      artifacts:
+        - id: petstore
+          configurations:
+            - environment: QA
+              parameters:
+                - key: mcpPath
+                  value: /mcp-server-qa
+                - key: targetURL
+                  value: https://qa.example.com/api/v3/
+```
+
+The save takes the edit lock first, as Edit in the UI does, and releases it afterwards. Downloading a server and
+uploading the folder back changes nothing: the flow keeps all its properties, only their order and the timestamps of
+the export differ.
+
+`--bump`, `--set-version` and the version check are not applied to MCP servers; the version of the manifest is used.
+
+Without `uiHost` and `uiCookie` everything behaves as before, and `artifact list` says so when a package has no
+integration flows.
+
+### Getting the session
+
+1. Log in to the Integration Suite UI and open **Design -> Integrations and APIs -> your package**.
+2. Open the Chrome DevTools (`Cmd+Option+I` / `F12`), tab **Network**, filter **Fetch/XHR**, reload the page.
+3. Click a request to the UI host, for example `artifacts`, and copy the value of the **`cookie`** request header
+   (right click -> Copy value). It must contain `JSESSIONID` and `__VCAP_ID__`.
+4. Put it into `.env`, in single quotes, and point the system at it:
+
+```bash
+LANDSCAPER_UI_HOST=https://<subaccount>.integrationsuite-trial01.cfapps.us10-001.hana.ondemand.com/shell/design
+LANDSCAPER_UI_COOKIE='...; __VCAP_ID__=...; JSESSIONID=s%3A...; ...'
+```
+
+```yaml
+  systems:
+    - id: dev
+      host: DEV_HOST
+      login: DEV_LOGIN_ENV_VAR
+      password: DEV_PASSWORD_ENV_VAR
+      tokenURL: DEV_TOKEN_URL_ENV_VAR
+      uiHost: LANDSCAPER_UI_HOST
+      uiCookie: LANDSCAPER_UI_COOKIE
+```
+
+When the session has expired, the UI answers with its login page; landscaper reports "the session in uiCookie is not
+valid any more" instead of an empty result. Copy a fresh cookie and run again. The cookie is a credential: keep it in
+`.env`, never in the landscape file. The audit log (`--log`) redacts it like the `Authorization` header.
+
+### The UI API
+
+Observed on a trial tenant on 2026-10-19. Undocumented, and SAP can change it without notice.
+
+| Call | Purpose |
+|---|---|
+| `GET /odata/1.0/workspace.svc/ContentEntities.ContentPackages('<package>')/Artifacts?$format=json` | Artifacts of a package, every type. MCP servers have `Type: MCPSERVER`; `Name` is the id, `reg_id` the registry id |
+| `GET /odata/1.0/workspace.svc/ContentEntities.ContentPackages('<package>')?$format=json` | `reg_id` of the package |
+| `GET /api/1.0/workspace/<package reg_id>/artifacts/<reg_id>/entities/<reg_id>?export=true` | The bundle zip. Answers `Accept: application/octet-stream` with an empty `500`, so landscaper sends `*/*` |
+| `GET /api/1.0/workspace/<package reg_id>/artifacts/<reg_id>/entities/<reg_id>/mcpartifacts/<id>` | The editor model: tools, OpenAPI, manifest. Answers under the display name as well |
+| `POST /api/1.0/workspace/<package reg_id>/mcpartifacts/` | Create a server from an OpenAPI definition (what the UI's wizard sends). Accepts a name the save later refuses |
+| `PUT /api/1.0/workspace/<package reg_id>/artifacts/<reg_id>?webdav=LOCK` / `?webdav=UNLOCK` | Take and release the edit lock (Edit and leaving the editor in the UI) |
+| `PUT .../entities/<reg_id>/mcpartifacts/<id>` | Save the editor model, under the lock only - without it `500 ARTIFACT_UPDATE_FAILED` "Update artifact in content store failed". Needs `mcpPath`, which the GET of the model leaves out, and a name of letters, digits and underscores |
+| `PUT .../mcpartifacts/<name>?action=DEPLOY&runtimeLocation=integrationcell&virtualHost=default`, body `{}` | Deploy, answers `taskId` |
+| `GET /api/1.0/deploystatus/<taskId>?bundleType=MCPSERVER&symbolicName=<reg_id>` | `status` `DEPLOYING`, `SUCCESS` or `FAIL`. The only place a failed deployment shows |
+| `GET /Operations/com.sap.it.op.tmn.commands.dashboard.webui.IntegrationComponentsListCommand?runtimeLocationId=integrationcell` | What is deployed on the Integration Cell, XML. A failed deployment stays `STARTING` here |
+| `POST /Operations/com.sap.it.nm.commands.deploy.DeleteContentCommand`, form `artifactIds`, `tenantId`, `runtimeLocationId` | Undeploy by the runtime id of the list |
+
+Mutating calls carry an `X-CSRF-Token`, fetched with `X-CSRF-Token: Fetch` on any GET of the UI.
+
+Every call carries the session cookie, `X-Requested-With: XMLHttpRequest` and `x-navcontext-header: Integration` -
+without the last one `GET /api/1.0/contentpackage/<reg_id>/artifacts` returns an empty list. See
+[changelog/0009-mcp-server-artifacts.md](changelog/0009-mcp-server-artifacts.md).
+
+The exported bundle:
+
+```
+META-INF/MANIFEST.MF        SAP-BundleType: MCPSERVER, SAP-RuntimeProfile: integrationcell,
+                            mcpartifacttype (HTTP_ENDPOINT), targetURL, Provide-Capability: mcpserver.<id>
+.project
+metainfo.prop
+src/main/resources/mcpspecification/mcpspecification.json    MCP server card: tools, resources, prompts
+src/main/resources/mcpsourcemapping/mcpsourcemapping.json    tool -> source operation
+src/main/resources/apidefinition/apidefinition.json          OpenAPI 3
+src/main/resources/parameters.prop, parameters.propdef       externalized parameters
+src/main/resources/scenarioflows/integrationflow/mcpartifact_default_a1.iflw
 ```
 
 ## How to deploy from a git repository to a tenant

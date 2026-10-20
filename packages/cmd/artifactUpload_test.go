@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -57,6 +58,8 @@ type stubTenant struct {
 	Guidelines *stubGuidelines
 	//Discover, runtime and delete state, nil until a package test sets it up
 	PackageOps *stubPackageOps
+	//UI API state for MCP servers, nil until an MCP test sets it up
+	MCP *stubMCP
 	Calls      []tenantCall
 }
 
@@ -100,6 +103,8 @@ func (tenant *stubTenant) record(request *http.Request) {
 		if json.Unmarshal(body, &payload) == nil {
 			call.Body = payload
 		}
+		//Put back for the handlers that read the body themselves
+		request.Body = io.NopCloser(bytes.NewReader(body))
 	}
 
 	tenant.Calls = append(tenant.Calls, call)
@@ -122,6 +127,11 @@ func (tenant *stubTenant) handle(writer http.ResponseWriter, request *http.Reque
 
 	//Copy, delete and runtime calls, see packageCopyDelete_test.go
 	if tenant.handlePackageOps(writer, request) {
+		return
+	}
+
+	//MCP server calls of the UI API, see mcpServers_test.go
+	if tenant.handleMCP(writer, request) {
 		return
 	}
 

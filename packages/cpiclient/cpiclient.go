@@ -47,6 +47,11 @@ type CPIClient struct {
 	VerboseLog  bool
 	//Audit log of every call to the tenant. A nil Logger records nothing.
 	Logger *auditlog.Logger
+	//Design time host of the Integration Suite UI and the browser session for
+	//it, used only by the MCP server calls of mcpservers.go
+	UIHost   string
+	UICookie string
+	uiClient *http.Client
 }
 
 type IntegrationPackage struct {

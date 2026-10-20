@@ -21,6 +21,7 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/Trifolium-project/landscaper/packages/cpiclient"
 	"github.com/spf13/cobra"
 )
 
@@ -62,6 +63,11 @@ func artifactUndeploy() {
 
 	artfct, err := system.Client.ReadIntegrationRuntimeArtifact(*artifact)
 	if err != nil {
+		//The v1 runtime API does not list MCP servers, the Integration Cell does
+		if system.Client.HasUISession() {
+			mcpServerUndeploy(system.Client, err)
+			return
+		}
 		log.Fatalln(err)
 	}
 
@@ -82,4 +88,31 @@ func artifactUndeploy() {
 
 	writer.Flush()
 
+}
+//mcpServerUndeploy is artifactUndeploy for an MCP server. notFound is the
+//answer of the v1 runtime API, reported when the Integration Cell does not
+//know the id either.
+func mcpServerUndeploy(client *cpiclient.CPIClient, notFound error) {
+
+	deployed, err := deployedMCPServerArtifact(client, *artifact)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if deployed == nil {
+		log.Fatalln(notFound)
+	}
+
+	if err := client.UndeployIntegrationCellArtifact(deployed); err != nil {
+		log.Fatalln(err)
+	}
+
+	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
+	fmt.Fprintf(writer, "Undeploy started...\n\n")
+	fmt.Fprintf(writer, "===Artifact metadata===\n\n")
+
+	fmt.Fprintf(writer, "%s\t%s\n", "ID:", deployed.SymbolicName)
+	fmt.Fprintf(writer, "%s\t%s\n", "Name:", deployed.Name)
+	fmt.Fprintf(writer, "%s\t%s\n", "Version:", deployed.Version)
+	fmt.Fprintf(writer, "%s\t%s\n", "Type:", "MCP Server")
+	writer.Flush()
 }

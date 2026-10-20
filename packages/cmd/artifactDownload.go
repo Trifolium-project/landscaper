@@ -85,7 +85,9 @@ Pass either --packages, or --artifacts, or --download-all. The ids of
 --packages and --artifacts are the base ids of the landscape configuration,
 without the environment suffix, which is appended by the command.
 
-Only integration flows are downloaded. Value mappings, message mappings and
+Integration flows are downloaded, and MCP servers when the system has uiHost
+and uiCookie, a browser session of the Integration Suite UI (see the README):
+the OData API does not expose MCP servers. Value mappings, message mappings and
 script collections live in other entity sets and are not covered.
 
 Packages delivered by SAP can be downloaded when they are editable, which is
@@ -221,7 +223,24 @@ func downloadTargets(environment *landscape.Environment, targets []downloadTarge
 			continue
 		}
 
-		rows = append(rows, downloadPackageArtifacts(environment, target, artifacts, outputDir)...)
+		//MCP servers are only reachable with a UI session. Without one the
+		//package is downloaded as before, iFlows only.
+		var mcpServers []*cpiclient.MCPServer
+		if client.HasUISession() {
+			mcpServers, err = client.ReadMCPServers(target.PackageId)
+			if err != nil {
+				rows = append(rows, &downloadRow{
+					ArtifactId: "-",
+					PackageId:  target.PackageId,
+					Version:    "-",
+					Status:     fmt.Sprintf("failed: MCP servers cannot be read: %s", singleLine(err.Error())),
+					Path:       "-",
+					Failed:     true,
+				})
+			}
+		}
+
+		rows = append(rows, downloadPackageArtifacts(environment, target, artifacts, mcpServers, outputDir)...)
 	}
 
 	return rows
@@ -376,7 +395,7 @@ func notDownloadableRows(target downloadTarget, artifacts []*cpiclient.Integrati
 //downloadPackageArtifacts downloads the requested artifacts of one package and
 //reports one row per artifact. A failing artifact does not stop the others.
 func downloadPackageArtifacts(environment *landscape.Environment, target downloadTarget,
-	artifacts []*cpiclient.IntegrationDesigntimeArtifact, outputDir string) []*downloadRow {
+	artifacts []*cpiclient.IntegrationDesigntimeArtifact, mcpServers []*cpiclient.MCPServer, outputDir string) []*downloadRow {
 
 	rows := []*downloadRow{}
 	found := map[string]bool{}
@@ -394,6 +413,30 @@ func downloadPackageArtifacts(environment *landscape.Environment, target downloa
 				ArtifactId: integrationArtifact.Id,
 				PackageId:  target.PackageId,
 				Version:    integrationArtifact.Version,
+				Status:     fmt.Sprintf("failed: %s", singleLine(err.Error())),
+				Path:       "-",
+				Failed:     true,
+			}
+		}
+		rows = append(rows, row)
+	}
+
+	//The registry id of the package is read once, and only when there is a
+	//server to download
+	packageRegistryId := ""
+	for _, server := range mcpServers {
+
+		if len(target.ArtifactIds) > 0 && !util.Contains(target.ArtifactIds, server.Id) {
+			continue
+		}
+		found[server.Id] = true
+
+		row, err := downloadMCPServer(environment, target.PackageId, &packageRegistryId, server, outputDir)
+		if err != nil {
+			row = &downloadRow{
+				ArtifactId: server.Id,
+				PackageId:  target.PackageId,
+				Version:    server.Version,
 				Status:     fmt.Sprintf("failed: %s", singleLine(err.Error())),
 				Path:       "-",
 				Failed:     true,
@@ -469,6 +512,61 @@ func downloadArtifact(environment *landscape.Environment, packageId string,
 
 	row.Status = "downloaded"
 	if version == draftVersion {
+		row.Status = "downloaded (draft)"
+	}
+
+	return row, nil
+}
+
+//downloadMCPServer exports one MCP server through the UI session and extracts
+//it into <outputDir>/<packageId>/<server id>, the same layout as an iFlow
+func downloadMCPServer(environment *landscape.Environment, packageId string, packageRegistryId *string,
+	server *cpiclient.MCPServer, outputDir string) (*downloadRow, error) {
+
+	if err := validatePathSegment("Artifact", server.Id); err != nil {
+		return nil, err
+	}
+
+	destination := filepath.Join(outputDir, packageId, server.Id)
+
+	row := &downloadRow{
+		ArtifactId: server.Id,
+		PackageId:  packageId,
+		Version:    server.Version,
+		Path:       destination,
+	}
+
+	if !*downloadForce && folderExists(destination) {
+		row.Status = "skipped, folder exists (use --force)"
+		return row, nil
+	}
+
+	client := environment.System.Client
+
+	if *packageRegistryId == "" {
+		registryId, err := client.ReadPackageRegistryId(packageId)
+		if err != nil {
+			return nil, err
+		}
+		*packageRegistryId = registryId
+	}
+
+	content, err := client.DownloadMCPServer(*packageRegistryId, server)
+	if err != nil {
+		return nil, err
+	}
+
+	bundleType, err := iflow.ReadManifestHeaderFromZip(content, iflow.HeaderSAPBundleType)
+	if err != nil || bundleType != cpiclient.ArtifactTypeMCPServer {
+		return nil, fmt.Errorf("the tenant did not return an MCP server archive for %s", server.Id)
+	}
+
+	if err := iflow.UnzipToDir(content, destination); err != nil {
+		return nil, err
+	}
+
+	row.Status = "downloaded"
+	if server.Version == cpiclient.MCPServerVersionDraft {
 		row.Status = "downloaded (draft)"
 	}
 

@@ -93,7 +93,7 @@ func TestAuditLogNeverContainsCredentials(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	downloadPackageArtifacts(environment, target, artifacts, output)
+	downloadPackageArtifacts(environment, target, artifacts, nil, output)
 
 	content, err := os.ReadFile(logger.Path())
 	if err != nil {
@@ -135,7 +135,7 @@ func TestAuditLogRecordsTenantCalls(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	rows := downloadPackageArtifacts(environment, target, artifacts, output)
+	rows := downloadPackageArtifacts(environment, target, artifacts, nil, output)
 	if len(rows) != 1 || rows[0].Status != "downloaded" {
 		t.Fatalf("unexpected rows: %+v", rows)
 	}
@@ -191,7 +191,7 @@ func TestAuditLogOmitsDownloadedArchive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	downloadPackageArtifacts(environment, target, artifacts, output)
+	downloadPackageArtifacts(environment, target, artifacts, nil, output)
 
 	content, err := os.ReadFile(logger.Path())
 	if err != nil {
@@ -252,7 +252,7 @@ func TestNoAuditLogWhenDisabled(t *testing.T) {
 	}
 
 	//Must not panic on the nil logger, and must write nothing
-	rows := downloadPackageArtifacts(environment, target, artifacts, output)
+	rows := downloadPackageArtifacts(environment, target, artifacts, nil, output)
 	auditItem(map[string]interface{}{"artifact": "X", "status": "downloaded"})
 
 	if len(rows) != 1 {

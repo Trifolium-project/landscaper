@@ -31,6 +31,8 @@ const (
 	HeaderBundleVersion      = "Bundle-Version"
 	HeaderBundleSymbolicName = "Bundle-SymbolicName"
 	HeaderBundleName         = "Bundle-Name"
+	//MCPSERVER for an MCP server, absent in an integration flow
+	HeaderSAPBundleType = "SAP-BundleType"
 )
 
 //manifestLine is a single physical line of a manifest, with its terminator kept

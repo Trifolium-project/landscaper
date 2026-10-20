@@ -92,7 +92,7 @@ func TestDownloadByPackage(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	rows := downloadPackageArtifacts(environment, target, artifacts, output)
+	rows := downloadPackageArtifacts(environment, target, artifacts, nil, output)
 
 	if len(rows) != 1 {
 		t.Fatalf("expected 1 row, got %d: %s", len(rows), statusesOf(rows))
@@ -141,7 +141,7 @@ func TestDownloadByArtifactResolvesSuffixedIds(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	rows := downloadPackageArtifacts(environment, targets[0], tenantArtifacts, output)
+	rows := downloadPackageArtifacts(environment, targets[0], tenantArtifacts, nil, output)
 	if len(rows) != 1 || rows[0].Status != "downloaded" {
 		t.Fatalf("unexpected rows: %s", statusesOf(rows))
 	}
@@ -185,7 +185,7 @@ func TestDownloadSkipsExistingFolder(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	rows := downloadPackageArtifacts(environment, target, artifacts, output)
+	rows := downloadPackageArtifacts(environment, target, artifacts, nil, output)
 
 	if len(rows) != 1 || !strings.HasPrefix(rows[0].Status, "skipped") {
 		t.Fatalf("unexpected rows: %s", statusesOf(rows))
@@ -229,7 +229,7 @@ func TestDownloadForceReplacesExistingFolder(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	rows := downloadPackageArtifacts(environment, target, artifacts, output)
+	rows := downloadPackageArtifacts(environment, target, artifacts, nil, output)
 
 	if len(rows) != 1 || rows[0].Status != "downloaded" {
 		t.Fatalf("unexpected rows: %s", statusesOf(rows))
@@ -257,7 +257,7 @@ func TestDownloadMarksDraft(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	rows := downloadPackageArtifacts(environment, target, artifacts, output)
+	rows := downloadPackageArtifacts(environment, target, artifacts, nil, output)
 
 	if len(rows) != 1 || rows[0].Status != "downloaded (draft)" {
 		t.Fatalf("unexpected rows: %s", statusesOf(rows))
@@ -283,7 +283,7 @@ func TestDownloadReportsFailureWithoutAborting(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	rows := downloadPackageArtifacts(environment, target, artifacts, output)
+	rows := downloadPackageArtifacts(environment, target, artifacts, nil, output)
 
 	if len(rows) != 2 {
 		t.Fatalf("expected 2 rows, got %d: %s", len(rows), statusesOf(rows))
@@ -326,7 +326,7 @@ func TestDownloadReportsMissingArtifact(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	rows := downloadPackageArtifacts(environment, target, artifacts, output)
+	rows := downloadPackageArtifacts(environment, target, artifacts, nil, output)
 
 	if len(rows) != 1 || !rows[0].Failed {
 		t.Fatalf("unexpected rows: %s", statusesOf(rows))
@@ -469,7 +469,7 @@ func TestDownloadRejectsNonArchiveAnswer(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	rows := downloadPackageArtifacts(environment, target, artifacts, output)
+	rows := downloadPackageArtifacts(environment, target, artifacts, nil, output)
 
 	if len(rows) != 1 || !rows[0].Failed {
 		t.Fatalf("unexpected rows: %s", statusesOf(rows))
