@@ -28,6 +28,7 @@ import (
 	"github.com/Trifolium-project/landscaper/packages/cpiclient"
 	"github.com/Trifolium-project/landscaper/packages/iflow"
 	"github.com/Trifolium-project/landscaper/packages/landscape"
+	"github.com/Trifolium-project/landscaper/packages/mcpserver"
 	"github.com/spf13/cobra"
 )
 
@@ -75,6 +76,13 @@ package is created when it does not exist yet. Configuration parameters
 declared for the target environment are applied after the upload.
 
 Use --deploy to deploy the artifacts once they are uploaded.
+
+A folder holding an MCP server (SAP-BundleType: MCPSERVER) needs uiHost and
+uiCookie of the system, see the README: the tenant has no import for MCP
+servers, so the server is created from its OpenAPI definition when it is
+missing and its editor model is then rewritten from the folder and saved.
+mcpPath and targetURL are its only configuration parameters. Zip archives of
+MCP servers are not supported.
 
 --apply-guideline-skips runs the design guidelines on every artifact that
 declares guidelineSkips in the landscape configuration and files those skips,
@@ -193,6 +201,11 @@ func artifactUpload(paths []string) {
 
 //uploadArtifact packs when needed and pushes a single artifact to the tenant
 func uploadArtifact(path string, targetEnvironment *landscape.Environment) (*uploadRow, error) {
+
+	//An MCP server has a manifest too, but no OData API to be uploaded through
+	if mcpserver.IsBundleDir(path) {
+		return uploadMCPServer(path, targetEnvironment)
+	}
 
 	//Checked before anything else, so that a wrong path is reported as a wrong
 	//path rather than as a missing landscape declaration

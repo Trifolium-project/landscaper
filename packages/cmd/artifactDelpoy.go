@@ -22,6 +22,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/Trifolium-project/landscaper/packages/cpiclient"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +30,12 @@ import (
 var artifactDelpoyCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Deploy artifact to runtime",
-	Long: `Deploy artifact to runtime`,
+	Long: `Deploy artifact to runtime.
+
+An MCP server is deployed when --artifact is not an integration flow, the
+system has uiHost and uiCookie and --pkg names the package holding the server.
+It is deployed to the runtime and virtual host of its manifest, Integration
+Cell. --wait works the same for both.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		artifactDeploy()
 	},
@@ -75,6 +81,11 @@ func artifactDeploy() {
 
 	artfct, err := system.Client.ReadIntegrationDesigntimeArtifact(*artifact, "Active")
 	if err != nil {
+		//Not an iFlow: with a UI session it may be an MCP server of --pkg
+		if system.Client.HasUISession() && *pkg != "" {
+			mcpServerDeploy(system.Client)
+			return
+		}
 		log.Fatalln(err)
 	}
 
@@ -108,6 +119,40 @@ func artifactDeploy() {
 	writer.Flush()
 
 	printDeployError(status)
+
+	exitWith(status.ExitCode())
+}
+//mcpServerDeploy is artifactDeploy for an MCP server
+func mcpServerDeploy(client *cpiclient.CPIClient) {
+
+	deployed, err := deployMCPServerById(client, *pkg, *artifact)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
+	fmt.Fprintf(writer, "Deploy started...\n\n")
+	fmt.Fprintf(writer, "===Artifact metadata===\n\n")
+
+	fmt.Fprintf(writer, "%s\t%s\n", "ID:", deployed.Server.Id)
+	fmt.Fprintf(writer, "%s\t%s\n", "Name:", deployed.Server.Name)
+	fmt.Fprintf(writer, "%s\t%s\n", "Version:", deployed.Version)
+	fmt.Fprintf(writer, "%s\t%s\n", "Package:", deployed.Server.PackageId)
+	fmt.Fprintf(writer, "%s\t%s\n", "Type:", "MCP Server")
+
+	if deployWait == nil || !*deployWait {
+		writer.Flush()
+		return
+	}
+
+	status := waitForDeployment(&mcpDeployTaskReader{client: client, taskId: deployed.TaskId, server: deployed.Server},
+		deployed.Server.Id, deployed.Version, *deployTimeout, *deployInterval)
+
+	fmt.Fprintf(writer, "%s\t%s\n", "Runtime Status:", status.Summary())
+	if status.ErrorText != "" {
+		fmt.Fprintf(writer, "%s\t%s\n", "Error:", singleLine(status.ErrorText))
+	}
+	writer.Flush()
 
 	exitWith(status.ExitCode())
 }

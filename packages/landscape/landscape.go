@@ -95,6 +95,11 @@ type LandscapeYAML struct {
 			Login    string
 			Password string
 			TokenURL string `yaml:"tokenURL"`
+			//Design time host of the Integration Suite UI and the name of the
+			//environment variable holding a browser session for it. Only the
+			//MCP server commands use them.
+			UIHost   string `yaml:"uiHost"`
+			UICookie string `yaml:"uiCookie"`
 		}
 		Packages []struct {
 			Id        string
@@ -338,6 +343,17 @@ func buildLandscapeFromManifest(landscapeYaml *LandscapeYAML) (*Landscape, error
 		}
 
 		system.Client = cpiclient.NewCPIBasicAuthClient(strings.TrimSpace(login), strings.TrimSpace(password), strings.TrimSpace(tokenURL), strings.TrimSpace(host), false)
+
+		//Like host, uiHost may be literal or the name of a variable. uiCookie is
+		//always a variable name: the session must not live in the YAML.
+		if systemYAML.UIHost != "" {
+			uiHost := systemYAML.UIHost
+			if uiHostFromEnvironment, _ := getEnvVariableValue(systemYAML.UIHost); uiHostFromEnvironment != "" {
+				uiHost = uiHostFromEnvironment
+			}
+			uiCookie, _ := getEnvVariableValue(systemYAML.UICookie)
+			system.Client.SetUISession(uiHost, uiCookie)
+		}
 
 		systems[system.Id] = system
 

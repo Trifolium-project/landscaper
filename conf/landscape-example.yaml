@@ -7,6 +7,9 @@ landscape:
       host: exxxxxx-tmn.hci.xxx.hana.ondemand.com
       login: DEV_LOGIN_ENV_VAR
       password: DEV_PASSWORD_ENV_VAR
+      #Optional, only for MCP servers, see README "MCP servers"
+      #uiHost: DEV_UI_HOST
+      #uiCookie: DEV_UI_COOKIE
     - id: prod
       name: Production Tenant Trial
       host: lxxxxxx-tmn.hci.xxx.hana.ondemand.com
