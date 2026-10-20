@@ -22,6 +22,7 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/Trifolium-project/landscaper/packages/cpiclient"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +32,12 @@ var onlyDeployed *bool
 var artifactListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List artifacts in package",
-	Long: `List artifacts in package`,
+	Long: `List the integration flows and MCP servers of a package.
+
+MCP servers are not available through the OData API. They are listed only when
+the system has uiHost and uiCookie, a browser session of the Integration Suite
+UI, see the README. Their deploy status is the one of the Integration Cell
+runtime.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		artifactList()
 	},
@@ -71,8 +77,22 @@ func artifactList() {
 		log.Fatalln(err)
 	}
 
+	//MCP servers are not in the OData API, they are read through the UI
+	//session of the system. Without one an empty package may well hold some.
+	var mcpServers []*cpiclient.MCPServer
+	var mcpDeployed []*cpiclient.IntegrationCellArtifact
+	var mcpErr error
+	if system.Client.HasUISession() {
+		mcpServers, mcpErr = system.Client.ReadMCPServers(*pkg)
+		if mcpErr == nil && len(mcpServers) > 0 {
+			mcpDeployed, mcpErr = system.Client.ReadIntegrationCellArtifacts(mcpRuntimeLocation)
+		}
+	} else if len(artifacts) == 0 {
+		fmt.Fprintf(os.Stderr, "Package %s has no integration flows. %s\n", *pkg, cpiclient.ErrNoUISession)
+	}
+
 	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
-	fmt.Fprintln(writer, "#\tArtefactId\tVersion\tPackage\tDeploy Status\tDeployed Version")
+	fmt.Fprintln(writer, "#\tArtefactId\tVersion\tPackage\tDeploy Status\tDeployed Version\tType")
 	index := 0
 	for _, art := range artifacts {
 		status := "unknown"
@@ -88,12 +108,28 @@ func artifactList() {
 		}
 		if !(*onlyDeployed && status == "Not deployed") {
 			index++
-			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%s\t%s\n", index, art.Id, art.Version, art.PackageId, status,deployedVersion)
+			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n", index, art.Id, art.Version, art.PackageId, status,deployedVersion, "Integration Flow")
 		}
 		
 		//fmt.Fprintf(writer, "%d\t%s\t%s\n", index, pkg.Id, pkg.Name)
 	}
+	//The status of an MCP server comes from the Integration Cell runtime
+	for _, server := range mcpServers {
+		status := "Not deployed"
+		deployedVersion := "-"
+		if deployed := findMCPServerArtifact(mcpDeployed, server.Id); deployed != nil {
+			status = deployed.SemanticState
+			deployedVersion = deployed.Version
+		}
+		if !(*onlyDeployed && status == "Not deployed") {
+			index++
+			fmt.Fprintf(writer, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n", index, server.Id, server.Version, server.PackageId, status, deployedVersion, "MCP Server")
+		}
+	}
 	writer.Flush()
-//
+
+	if mcpErr != nil {
+		log.Fatalln(mcpErr)
+	}
 
 }
